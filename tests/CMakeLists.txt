@@ -13,11 +13,13 @@ set(MQCES_UNIT_TESTS
     unit/test_spatial_rank_gemm.cpp
     unit/test_spatial_rank_approx.cpp
     unit/test_inverse_rank.cpp
+    unit/test_inverse_vz.cpp
     unit/test_score.cpp
     unit/test_uncertainty.cpp
     unit/test_parallel_shim.cpp
     unit/test_classify_classic.cpp
     unit/test_classify_v2.cpp
+    unit/test_classify_v3.cpp
     unit/test_nota.cpp
 )
 
@@ -51,6 +53,7 @@ set(MQCES_INTEGRATION_TESTS
     integration/test_burnup_pipeline.cpp
     integration/test_paper_table1.cpp
     integration/test_sampling_score_drift.cpp
+    integration/test_solver_score_parity.cpp
 )
 
 foreach(_src IN LISTS MQCES_INTEGRATION_TESTS)

@@ -36,4 +36,18 @@ ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
 }  // namespace v2
 
+// v3 — paired-difference t-statistic (as in v2) but the inner inverse-rank
+// solver is Vardi-Zhang (Vardi & Zhang 2000) instead of plain Weiszfeld.
+// VZ closes the residual-plateau pathology that forces v1/v2 to use a
+// loose Weiszfeld tolerance, so v3 scores are reproducible to ~1e-9
+// regardless of whether iterates hover near a vertex y_i.
+//
+// Caller-provided options.solver is honored, defaulting to a tight VZ
+// config inside the classifier when unset (mc_samples / nota / sampling
+// behavior matches v2).
+namespace v3 {
+ClassificationResult classify(
+    const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
+}  // namespace v3
+
 }  // namespace mqces

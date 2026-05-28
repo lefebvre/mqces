@@ -27,6 +27,7 @@ set(MQCES_SOURCES
     uncertainty.cpp
     classify_classic.cpp
     classify_v2.cpp
+    classify_v3.cpp
     nota.cpp
 )
 

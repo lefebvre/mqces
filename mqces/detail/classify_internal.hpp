@@ -63,8 +63,15 @@ inline std::uint64_t replicate_seed(
 
 // Run the Monte-Carlo replicate loop. Returns a (K × N) matrix where row k
 // holds the N similarity scores of (perturbed test) vs (perturbed class k).
+//
+// The explicit-solver overload is used by every classifier variant; v1/v2
+// pass the loose Weiszfeld default that matches similarity_score's 3-arg
+// behavior, v3 passes a tight VardiZhang config, v4 (tranche l) will pass
+// VardiZhangAA. Sampling is read from `opts.sampling` so the same MC loop
+// works exact or subsampled.
 inline Eigen::MatrixXd collect_replicate_scores(
-    const Sample& test, std::span<const Class> known, const ClassifierOptions& opts)
+    const Sample& test, std::span<const Class> known, const ClassifierOptions& opts,
+    const SolverConfig& solver)
 {
     const auto K = static_cast<Eigen::Index>(known.size());
     const auto N = static_cast<Eigen::Index>(opts.uncertainty.mc_samples);
@@ -83,13 +90,22 @@ inline Eigen::MatrixXd collect_replicate_scores(
             Sample class_p = perturb(
                 known[static_cast<std::size_t>(k)].specimens, eps,
                 replicate_seed(base, i_, static_cast<std::size_t>(k)));
-            // similarity_score's 3-arg form uses its own (loose) Weiszfeld
-            // default; v1/v2 don't honor opts.solver. v3/v4 (tranches k/l)
-            // will introduce their own MC paths that pass opts.solver.
-            scores(k, i) = similarity_score(test_p, class_p, opts.weights);
+            scores(k, i)
+                = similarity_score(test_p, class_p, opts.weights, solver, opts.sampling);
         }
     });
     return scores;
+}
+
+// SolverConfig used by v1/v2 — loose Weiszfeld matching the 3-arg
+// similarity_score default that avoided the plateau in tranche (a).
+inline SolverConfig classic_solver_config()
+{
+    SolverConfig c;
+    c.kind      = SolverKind::Weiszfeld;
+    c.tol       = 1e-5;
+    c.max_iters = 1000;
+    return c;
 }
 
 // Sample mean of a row of `scores`.

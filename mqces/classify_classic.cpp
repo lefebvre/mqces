@@ -20,7 +20,8 @@ ClassificationResult classify(
     const auto K = static_cast<Eigen::Index>(known.size());
     const auto N = static_cast<Eigen::Index>(options.uncertainty.mc_samples);
 
-    const Eigen::MatrixXd scores = detail::collect_replicate_scores(test, known, options);
+    const Eigen::MatrixXd scores = detail::collect_replicate_scores(
+        test, known, options, detail::classic_solver_config());
 
     // Per-class mean and variance.
     Eigen::VectorXd means(K);
