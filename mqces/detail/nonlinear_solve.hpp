@@ -17,8 +17,12 @@
 //
 // This is a straightforward fixed-point map; convergence is geometric for
 // generic configurations (and very fast for the small d ≤ 10, M ~ 50 cases
-// the QC method actually exercises). Anderson acceleration can be layered
-// on later if profiling shows it matters.
+// the QC method actually exercises).
+//
+// TODO: Plain Weiszfeld plateaus around residual ~1e-6 to ~1e-7 when the
+// iterate sits near (but not on) a y_i — a known failure mode. Anderson
+// acceleration or the Vardi-Zhang regularization would close that gap.
+// similarity_score loosens the tolerance to 1e-5 to work around it.
 
 namespace mqces::detail {
 

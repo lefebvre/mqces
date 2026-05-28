@@ -16,11 +16,18 @@ set(MQCES_PUBLIC_HEADERS
     types.hpp
     quantile.hpp
     score.hpp
+    uncertainty.hpp
+    classify.hpp
+    nota.hpp
 )
 
 set(MQCES_SOURCES
     quantile.cpp
     score.cpp
+    uncertainty.cpp
+    classify_classic.cpp
+    classify_v2.cpp
+    nota.cpp
 )
 
 add_library(mqces ${MQCES_SOURCES})
