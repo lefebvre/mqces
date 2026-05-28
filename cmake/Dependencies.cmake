@@ -17,6 +17,7 @@ set(MQCES_DEP_GTEST_TAG     "v1.17.0" CACHE STRING "GoogleTest release tag")
 set(MQCES_DEP_BENCHMARK_TAG "v1.9.5"  CACHE STRING "Google Benchmark release tag")
 set(MQCES_DEP_NANOBIND_TAG  "v2.12.0" CACHE STRING "nanobind release tag")
 set(MQCES_DEP_KOKKOS_TAG    "5.1.1"   CACHE STRING "Kokkos release tag")
+set(MQCES_DEP_JSON_TAG      "v3.12.0" CACHE STRING "nlohmann/json release tag")
 
 # ---- Eigen -----------------------------------------------------------------
 # The core library depends on Eigen unconditionally.
@@ -94,6 +95,20 @@ if(MQCES_ENABLE_KOKKOS)
         SYSTEM
     )
     FetchContent_MakeAvailable(kokkos)
+endif()
+
+# ---- nlohmann/json --------------------------------------------------------
+# Used by the CLI and (optionally) other consumers. Header-only.
+if(MQCES_ENABLE_CLI)
+    set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+    set(JSON_Install    OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(json
+        GIT_REPOSITORY https://github.com/nlohmann/json.git
+        GIT_TAG        ${MQCES_DEP_JSON_TAG}
+        GIT_SHALLOW    TRUE
+        SYSTEM
+    )
+    FetchContent_MakeAvailable(json)
 endif()
 
 # ---- OpenMP (system dep, not FetchContent) ---------------------------------

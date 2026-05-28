@@ -37,6 +37,7 @@ DEPS: tuple[Dep, ...] = (
     Dep("MQCES_DEP_BENCHMARK_TAG", "https://github.com/google/benchmark.git"),
     Dep("MQCES_DEP_NANOBIND_TAG",  "https://github.com/wjakob/nanobind.git"),
     Dep("MQCES_DEP_KOKKOS_TAG",    "https://github.com/kokkos/kokkos.git"),
+    Dep("MQCES_DEP_JSON_TAG",      "https://github.com/nlohmann/json.git"),
 )
 
 
