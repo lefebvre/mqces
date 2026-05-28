@@ -25,4 +25,12 @@ double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& 
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights,
                         const SolverConfig& solver);
 
+// Full surface — caller controls both inner solver and reference
+// subsampling for spatial_rank and inverse_spatial_rank. Both internal
+// `spatial_rank(y, sampling)` and `inverse_spatial_rank(_, y, _, sampling)`
+// calls use the SAME sampling config, so the R-subset of each cloud is
+// consistent across the two reconstruction directions.
+double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights,
+                        const SolverConfig& solver, const SamplingConfig& sampling);
+
 }  // namespace mqces

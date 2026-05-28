@@ -38,7 +38,7 @@ SolverConfig score_default_solver()
 }  // namespace
 
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights,
-                        const SolverConfig& solver)
+                        const SolverConfig& solver, const SamplingConfig& sampling)
 {
     if (x.cols() != y.cols()) {
         throw std::invalid_argument(
@@ -51,19 +51,25 @@ double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& 
             + ") must equal x.cols() (" + std::to_string(x.cols()) + ")");
     }
 
-    auto u_x = spatial_rank(x);
-    auto u_y = spatial_rank(y);
+    auto u_x = spatial_rank(x, sampling);
+    auto u_y = spatial_rank(y, sampling);
 
-    auto x_tilde = inverse_spatial_rank(u_x, y, solver).x_tilde;
-    auto y_tilde = inverse_spatial_rank(u_y, x, solver).x_tilde;
+    auto x_tilde = inverse_spatial_rank(u_x, y, solver, sampling).x_tilde;
+    auto y_tilde = inverse_spatial_rank(u_y, x, solver, sampling).x_tilde;
 
     return weighted_sq_distance(x_tilde, x, weights)
          + weighted_sq_distance(y_tilde, y, weights);
 }
 
+double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights,
+                        const SolverConfig& solver)
+{
+    return similarity_score(x, y, weights, solver, SamplingConfig{});
+}
+
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights)
 {
-    return similarity_score(x, y, weights, score_default_solver());
+    return similarity_score(x, y, weights, score_default_solver(), SamplingConfig{});
 }
 
 }  // namespace mqces

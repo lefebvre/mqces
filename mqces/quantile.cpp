@@ -1,6 +1,7 @@
 #include <mqces/quantile.hpp>
 
 #include <mqces/detail/inverse_solvers.hpp>
+#include <mqces/detail/reference_sample.hpp>
 
 #include <Eigen/Core>
 
@@ -8,6 +9,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace mqces {
 
@@ -114,6 +116,100 @@ RowMajorMatrix spatial_rank(const Sample& x, double eps)
     return u;
 }
 
+namespace {
+
+// Approximate spatial rank: each query row j accumulates contributions from
+// an R-sized reference subset of the same cloud. The divisor is R (the
+// configured reference size), matching Eq. 1's convention of "divide by
+// the sample size" — when j happens to be in Refs, the i == j term is
+// skipped but the divisor is unchanged, introducing an O(1/R) bias that
+// is dominated by the O(1/√R) variance for any practical R.
+RowMajorMatrix spatial_rank_approx_uniform(
+    const Sample& x, std::size_t R_in, std::uint64_t seed, double eps)
+{
+    const Eigen::Index N = x.rows();
+    const Eigen::Index d = x.cols();
+    RowMajorMatrix     u = RowMajorMatrix::Zero(N, d);
+    if (N <= 1) {
+        return u;
+    }
+    const auto indices = detail::uniform_reference_indices(
+        static_cast<std::size_t>(N), R_in, seed);
+    const auto         R  = static_cast<Eigen::Index>(indices.size());
+    if (R <= 0) {
+        return u;
+    }
+    const RowMajorMatrix x_refs = detail::gather_rows(x, indices);
+    const double         eps2   = eps * eps;
+
+    // Membership test: which query rows are themselves reference points?
+    // Constant lookup avoids an inner branch over the sorted vector.
+    std::vector<unsigned char> in_refs(static_cast<std::size_t>(N), 0);
+    for (auto idx : indices) {
+        in_refs[static_cast<std::size_t>(idx)] = 1;
+    }
+
+    // Pre-compute squared norms.
+    Eigen::VectorXd s_x(N);
+    for (Eigen::Index i = 0; i < N; ++i) {
+        s_x(i) = x.row(i).squaredNorm();
+    }
+    Eigen::VectorXd s_refs(R);
+    for (Eigen::Index k = 0; k < R; ++k) {
+        s_refs(k) = x_refs.row(k).squaredNorm();
+    }
+
+    // Tile over query rows for cache locality. Each tile materializes a
+    // (kTileRows × R) Gram block ~= 256 × R doubles, fits in L2 for R up
+    // to ~16 K (32 MB).
+    for (Eigen::Index a = 0; a < N; a += kTileRows) {
+        const Eigen::Index    Ta = std::min(kTileRows, N - a);
+        const auto            X_a = x.middleRows(a, Ta);
+        const Eigen::MatrixXd G   = X_a * x_refs.transpose();  // Ta × R
+
+        for (Eigen::Index ii = 0; ii < Ta; ++ii) {
+            const Eigen::Index j     = a + ii;
+            const double       s_j   = s_x(j);
+            const bool         skip_self = in_refs[static_cast<std::size_t>(j)] != 0;
+            Eigen::RowVectorXd acc = Eigen::RowVectorXd::Zero(d);
+            for (Eigen::Index k = 0; k < R; ++k) {
+                if (skip_self && indices[static_cast<std::size_t>(k)] == j) {
+                    continue;
+                }
+                double d2 = s_j + s_refs(k) - 2.0 * G(ii, k);
+                const double cancel_threshold = 1e-12 * (std::abs(s_j) + std::abs(s_refs(k)));
+                if (d2 < cancel_threshold) {
+                    Eigen::RowVectorXd diff = X_a.row(ii) - x_refs.row(k);
+                    d2                      = diff.squaredNorm();
+                }
+                if (d2 < eps2) {
+                    continue;
+                }
+                const double d_inv = 1.0 / std::sqrt(d2);
+                acc += (X_a.row(ii) - x_refs.row(k)) * d_inv;
+            }
+            u.row(j) = acc / static_cast<double>(R);
+        }
+    }
+    return u;
+}
+
+}  // namespace
+
+RowMajorMatrix spatial_rank(const Sample& x, const SamplingConfig& sampling, double eps)
+{
+    const auto N = static_cast<std::size_t>(x.rows());
+    if (sampling.reference_size == 0 || sampling.reference_size >= N) {
+        return spatial_rank(x, eps);
+    }
+    if (sampling.strategy != SamplingConfig::Strategy::Uniform) {
+        throw std::invalid_argument(
+            "spatial_rank: only SamplingConfig::Strategy::Uniform is implemented; "
+            "Stratified is reserved for a future tranche");
+    }
+    return spatial_rank_approx_uniform(x, sampling.reference_size, sampling.seed, eps);
+}
+
 InverseRankResult inverse_spatial_rank(
     const RowMajorMatrix& u, const Sample& y, const SolverConfig& solver)
 {
@@ -142,6 +238,27 @@ InverseRankResult inverse_spatial_rank(
         result.max_residual   = std::max(result.max_residual, row_result.residual);
     }
     return result;
+}
+
+InverseRankResult inverse_spatial_rank(
+    const RowMajorMatrix& u, const Sample& y, const SolverConfig& solver,
+    const SamplingConfig& sampling)
+{
+    const auto M = static_cast<std::size_t>(y.rows());
+    if (sampling.reference_size == 0 || sampling.reference_size >= M) {
+        return inverse_spatial_rank(u, y, solver);
+    }
+    if (sampling.strategy != SamplingConfig::Strategy::Uniform) {
+        throw std::invalid_argument(
+            "inverse_spatial_rank: only SamplingConfig::Strategy::Uniform is "
+            "implemented; Stratified is reserved for a future tranche");
+    }
+    // Materialize the reference subset once; the Weiszfeld inner loop then
+    // sees a smaller "cloud" and converges much faster at the cost of an
+    // O(1/R)-variance approximation.
+    auto       indices = detail::uniform_reference_indices(M, sampling.reference_size, sampling.seed);
+    Sample     y_refs  = detail::gather_rows(y, indices);
+    return inverse_spatial_rank(u, y_refs, solver);
 }
 
 InverseRankResult inverse_spatial_rank(

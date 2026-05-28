@@ -63,10 +63,22 @@ struct SolverConfig {
     bool        aa_safeguard  = true;
 };
 
+// Reference-subset approximation for spatial_rank / inverse_spatial_rank.
+// `reference_size == 0` means "exact" (use all N points); positive values
+// switch to the O(N·R) approximate kernels. Stratified is reserved for a
+// later refinement; today only Uniform is honored.
+struct SamplingConfig {
+    enum class Strategy : std::uint8_t { Uniform, Stratified };
+    std::size_t   reference_size = 0;            // 0 == exact
+    Strategy      strategy       = Strategy::Uniform;
+    std::uint64_t seed           = 0xACEBEEFULL;
+};
+
 struct ClassifierOptions {
     FeatureWeights    weights;  // diag(W); required, no default — see Eq. 4
     UncertaintyConfig uncertainty{};
     SolverConfig      solver{};
+    SamplingConfig    sampling{};
     double            nota_threshold = 0.05;
     int               n_threads = 0;  // 0 == auto (OpenMP runtime default)
 };
