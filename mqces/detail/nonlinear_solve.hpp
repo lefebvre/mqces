@@ -47,15 +47,16 @@ inline WeiszfeldResult solve_inverse_rank_row(
 
     WeiszfeldResult r;
     for (std::size_t k = 0; k < max_iters; ++k) {
-        Eigen::VectorXd numerator   = M * u;
-        double          inv_d_sum   = 0.0;
-        bool            had_overlap = false;
+        Eigen::VectorXd numerator = M * u;
+        double          inv_d_sum = 0.0;
 
+        // Skipping y_i with d < eps is exactly the i ≠ j exclusion of Eq. 2:
+        // a coincident y_i contributes an undefined unit vector and must be
+        // omitted regardless of whether the iterate transiently lands on it.
         for (Eigen::Index i = 0; i < y.rows(); ++i) {
             Eigen::VectorXd diff = x - y.row(i).transpose();
             double          d    = diff.norm();
             if (d < eps) {
-                had_overlap = true;
                 continue;
             }
             numerator += y.row(i).transpose() / d;
@@ -77,7 +78,7 @@ inline WeiszfeldResult solve_inverse_rank_row(
         r.iters                  = k + 1;
         r.residual               = step_len;
 
-        if (step_len < tol && !had_overlap) {
+        if (step_len < tol) {
             r.x         = std::move(x);
             r.converged = true;
             return r;

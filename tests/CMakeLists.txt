@@ -10,6 +10,8 @@ include(GoogleTest)
 
 set(MQCES_UNIT_TESTS
     unit/test_spatial_rank.cpp
+    unit/test_inverse_rank.cpp
+    unit/test_score.cpp
 )
 
 foreach(_src IN LISTS MQCES_UNIT_TESTS)
