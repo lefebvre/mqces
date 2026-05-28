@@ -1,0 +1,57 @@
+# Build directories
+build/
+build-*/
+out/
+cmake-build-*/
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+Testing/
+_deps/
+
+# Editor / IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/c_cpp_properties.json
+.idea/
+.cache/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+*.whl
+
+# Coverage
+*.gcda
+*.gcno
+*.gcov
+coverage/
+*.profraw
+*.profdata
+
+# Sanitizer logs
+*.log.asan
+*.log.ubsan
+*.log.tsan
+
+# Reference papers kept locally, not committed (see README.md)
+*.pdf

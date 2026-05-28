@@ -1,0 +1,78 @@
+{
+    // ---- CMake Tools (ms-vscode.cmake-tools) -----------------------------
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.buildDirectory": "${workspaceFolder}/build",
+    "cmake.generator": "Ninja",
+    "cmake.configureOnOpen": true,
+    "cmake.configureOnEdit": false,
+    "cmake.parallelJobs": 0,
+    "cmake.exportCompileCommandsFile": true,
+    "cmake.copyCompileCommands": "${workspaceFolder}/compile_commands.json",
+
+    // Project options surfaced as CMake cache vars. Flip in the GUI via
+    // "CMake: Edit CMake Cache (UI)" or override per-preset.
+    "cmake.configureSettings": {
+        "MQCES_ENABLE_TESTS": "ON",
+        "MQCES_ENABLE_BENCHMARKS": "OFF",
+        "MQCES_ENABLE_PYTHON": "OFF",
+        "MQCES_ENABLE_CLI": "ON",
+        "MQCES_ENABLE_OPENMP": "ON",
+        "MQCES_ENABLE_KOKKOS": "OFF",
+        "MQCES_ENABLE_KOKKOS_CUDA": "OFF",
+        "MQCES_ENABLE_SANITIZER": "none",
+        "MQCES_ENABLE_COVERAGE": "OFF",
+        "MQCES_ENABLE_CLANG_TIDY": "OFF"
+    },
+
+    // ---- C/C++ language services -----------------------------------------
+    // We use clangd (llvm-vs-code-extensions.vscode-clangd) and disable the
+    // Microsoft C++ extension's IntelliSense to avoid conflicts.
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "C_Cpp.autoAddFileAssociations": false,
+    "clangd.arguments": [
+        "--background-index",
+        "--clang-tidy",
+        "--header-insertion=never",
+        "--completion-style=detailed",
+        "--compile-commands-dir=${workspaceFolder}"
+    ],
+
+    // ---- Editor ----------------------------------------------------------
+    "editor.formatOnSave": true,
+    "editor.rulers": [100],
+    "editor.tabSize": 4,
+    "editor.insertSpaces": true,
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.eol": "\n",
+
+    "[cpp]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+    },
+    "[c]": {
+        "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd"
+    },
+    "[cmake]": {
+        "editor.defaultFormatter": "cheshirekow.cmake-format",
+        "editor.tabSize": 4
+    },
+    "[python]": {
+        "editor.tabSize": 4
+    },
+
+    "files.associations": {
+        "*.hpp": "cpp",
+        "*.tpp": "cpp",
+        "*.ipp": "cpp"
+    },
+
+    "search.exclude": {
+        "build/": true,
+        "build-*/": true,
+        "_deps/": true
+    },
+
+    // ---- Test explorer ---------------------------------------------------
+    "testMate.cpp.test.executables": "${workspaceFolder}/build/tests/**/test_*"
+}
