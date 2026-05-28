@@ -1,0 +1,10 @@
+#pragma once
+
+namespace mqces {
+
+constexpr int         version_major = @PROJECT_VERSION_MAJOR@;
+constexpr int         version_minor = @PROJECT_VERSION_MINOR@;
+constexpr int         version_patch = @PROJECT_VERSION_PATCH@;
+constexpr const char* version_string = "@PROJECT_VERSION@";
+
+}  // namespace mqces

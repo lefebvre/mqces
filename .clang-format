@@ -1,0 +1,72 @@
+---
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++20
+
+ColumnLimit: 100
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+ContinuationIndentWidth: 2
+AccessModifierOffset: -4
+
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Empty
+
+AlwaysBreakAfterReturnType: None
+AlwaysBreakTemplateDeclarations: Yes
+BinPackArguments: false
+BinPackParameters: false
+PackConstructorInitializers: NextLine
+BreakBeforeBraces: Attach
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+QualifierAlignment: Left
+
+IncludeBlocks: Regroup
+IncludeCategories:
+  # Project headers — quoted form
+  - Regex:    '^"mqces/'
+    Priority: 1
+  - Regex:    '^"'
+    Priority: 2
+  # mqces public headers via angle includes
+  - Regex:    '^<mqces/'
+    Priority: 3
+  # Third-party libraries
+  - Regex:    '^<(Eigen|gtest|benchmark|nanobind|Kokkos)'
+    Priority: 4
+  # C++ standard library (heuristic: no slash, no extension)
+  - Regex:    '^<[a-z_]+>$'
+    Priority: 6
+  # C system headers
+  - Regex:    '^<.+\.h>$'
+    Priority: 5
+  - Regex:    '.*'
+    Priority: 7
+
+SortIncludes: CaseSensitive
+SortUsingDeclarations: true
+
+NamespaceIndentation: None
+FixNamespaceComments: true
+ShortNamespaceLines: 0
+
+SpaceBeforeCpp11BracedList: false
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+Cpp11BracedListStyle: true
+
+InsertNewlineAtEOF: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+
+DerivePointerAlignment: false
+ReflowComments: true
