@@ -1,0 +1,22 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Eigen 5 ships its own CMake package. Downstream consumers must have it on
+# their CMAKE_PREFIX_PATH (either system-installed or pulled in by their
+# own FetchContent).
+find_dependency(Eigen3 @MQCES_DEP_EIGEN_TAG@ CONFIG)
+
+# OpenMP is an interface dependency only when the library was built with
+# the OpenMP backend on.
+if(@MQCES_ENABLE_OPENMP@ AND NOT @MQCES_ENABLE_KOKKOS@)
+    find_dependency(OpenMP)
+endif()
+
+if(@MQCES_ENABLE_KOKKOS@)
+    find_dependency(Kokkos @MQCES_DEP_KOKKOS_TAG@ CONFIG)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/mqcesTargets.cmake")
+
+check_required_components(mqces)

@@ -21,10 +21,13 @@ set(_mqces_gnu_warnings
     -Woverloaded-virtual
     -Wconversion
     -Wsign-conversion
-    -Wnull-dereference
     -Wdouble-promotion
     -Wformat=2
     -Wimplicit-fallthrough
+    # -Wnull-dereference is intentionally omitted: GCC 14 fires false
+    # positives inside Eigen's inlined AVX intrinsics (see e.g. redux_impl
+    # and findCoeff). The warning is low-signal in general C++ code and
+    # specifically broken with the Eigen template surface mqces uses.
 )
 
 set(_mqces_gcc_extra

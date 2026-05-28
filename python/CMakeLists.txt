@@ -15,7 +15,9 @@ nanobind_add_module(_mqces_core
 target_link_libraries(_mqces_core
     PRIVATE
         mqces::mqces
-        mqces::warnings
+        # mqces::warnings intentionally omitted: the bindings TU pulls in
+        # nanobind's templates, which trip several of our strict warnings
+        # (notably -Wold-style-cast) on Python C-API casts we don't control.
 )
 
 # The .so lives inside the Python package directory so that

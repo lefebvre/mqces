@@ -1,0 +1,51 @@
+# pre-commit hooks for mqces. Install once with `pre-commit install` in the
+# repo root; thereafter every commit runs these checks.
+#
+# To run on all files without committing:
+#     pre-commit run --all-files
+
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v5.0.0
+      hooks:
+          - id: trailing-whitespace
+            exclude: |
+                (?x)^(
+                    tests/data/fixtures_data\.(hpp|cpp)|
+                    tests/data/expected_scores\.(hpp|cpp)
+                )$
+          - id: end-of-file-fixer
+            exclude: |
+                (?x)^(
+                    tests/data/fixtures_data\.(hpp|cpp)|
+                    tests/data/expected_scores\.(hpp|cpp)
+                )$
+          - id: check-yaml
+          - id: check-json
+          - id: check-merge-conflict
+          - id: check-added-large-files
+            args: ["--maxkb=512"]
+            exclude: |
+                (?x)^(
+                    tests/data/fixtures_data\.cpp
+                )$
+          - id: mixed-line-ending
+            args: ["--fix=lf"]
+
+    - repo: https://github.com/pre-commit/mirrors-clang-format
+      rev: v19.1.7
+      hooks:
+          - id: clang-format
+            types_or: [c++, c]
+            exclude: |
+                (?x)^(
+                    tests/data/fixtures_data\.(hpp|cpp)|
+                    tests/data/expected_scores\.(hpp|cpp)|
+                    build/.*
+                )$
+
+    - repo: https://github.com/cheshirekow/cmake-format-precommit
+      rev: v0.6.13
+      hooks:
+          - id: cmake-format
+            additional_dependencies: [pyyaml]

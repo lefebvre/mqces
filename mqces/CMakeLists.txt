@@ -49,7 +49,9 @@ target_link_libraries(mqces
     PUBLIC
         Eigen3::Eigen
     PRIVATE
-        mqces::warnings
+        # Wrap the warnings interface in BUILD_INTERFACE so the install
+        # export of mqces doesn't try to drag the local target with it.
+        $<BUILD_INTERFACE:mqces::warnings>
 )
 
 if(MQCES_ENABLE_OPENMP AND NOT MQCES_ENABLE_KOKKOS)
@@ -73,7 +75,46 @@ set_target_properties(mqces PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-# Install / find_package(mqces) support is deferred to a later tranche:
-# exporting through FetchContent'd Eigen + an INTERFACE warnings target needs
-# a hand-written mqcesConfig.cmake.in with find_dependency(Eigen3). Not
-# needed for the in-tree test cycle.
+# ---- Install rules (opt-in) ------------------------------------------------
+# MQCES_ENABLE_INSTALL is OFF by default because the FetchContent'd Eigen
+# isn't installable as part of our build — its target ("eigen") can't be
+# re-exported through the mqcesTargets set. When the user opts in, they're
+# expected to either (a) build mqces against a system-installed Eigen
+# (--DCMAKE_PREFIX_PATH pointing at it) or (b) post-install Eigen via its
+# own install command into the same prefix.
+if(MQCES_ENABLE_INSTALL)
+    include(GNUInstallDirs)
+    include(CMakePackageConfigHelpers)
+
+    install(TARGETS mqces
+        EXPORT      mqcesTargets
+        ARCHIVE     DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY     DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        INCLUDES    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    )
+
+    install(FILES ${MQCES_PUBLIC_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mqces)
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/mqces/version.hpp"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/mqces)
+
+    install(EXPORT mqcesTargets
+        FILE        mqcesTargets.cmake
+        NAMESPACE   mqces::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mqces)
+
+    configure_package_config_file(
+        "${CMAKE_SOURCE_DIR}/cmake/mqcesConfig.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/mqcesConfig.cmake"
+        INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mqces
+    )
+    write_basic_package_version_file(
+        "${CMAKE_CURRENT_BINARY_DIR}/mqcesConfigVersion.cmake"
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY SameMajorVersion
+    )
+    install(FILES
+        "${CMAKE_CURRENT_BINARY_DIR}/mqcesConfig.cmake"
+        "${CMAKE_CURRENT_BINARY_DIR}/mqcesConfigVersion.cmake"
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mqces)
+endif()
