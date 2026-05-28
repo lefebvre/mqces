@@ -103,7 +103,7 @@ def spatial_rank(x: np.ndarray, eps: float = 1e-12) -> np.ndarray:
 
 def inverse_spatial_rank_row(u_j: np.ndarray, y: np.ndarray,
                              tol: float, max_iters: int) -> np.ndarray:
-    """Weiszfeld iteration matching detail/nonlinear_solve.hpp."""
+    """Weiszfeld iteration matching detail/inverse_solvers.hpp."""
     M = y.shape[0]
     x = y.mean(axis=0) + u_j
     for _ in range(max_iters):

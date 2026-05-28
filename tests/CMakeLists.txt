@@ -10,6 +10,7 @@ include(GoogleTest)
 
 set(MQCES_UNIT_TESTS
     unit/test_spatial_rank.cpp
+    unit/test_spatial_rank_gemm.cpp
     unit/test_inverse_rank.cpp
     unit/test_score.cpp
     unit/test_uncertainty.cpp

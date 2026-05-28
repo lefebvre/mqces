@@ -83,6 +83,9 @@ inline Eigen::MatrixXd collect_replicate_scores(
             Sample class_p = perturb(
                 known[static_cast<std::size_t>(k)].specimens, eps,
                 replicate_seed(base, i_, static_cast<std::size_t>(k)));
+            // similarity_score's 3-arg form uses its own (loose) Weiszfeld
+            // default; v1/v2 don't honor opts.solver. v3/v4 (tranches k/l)
+            // will introduce their own MC paths that pass opts.solver.
             scores(k, i) = similarity_score(test_p, class_p, opts.weights);
         }
     });

@@ -41,9 +41,32 @@ struct UncertaintyConfig {
     std::uint64_t seed = 0xC0FFEEULL;  // deterministic; per-thread streams derived
 };
 
+// Inner-solver selection for inverse_spatial_rank (Eq. 2). VardiZhang and
+// VardiZhangAA are reserved here so the public API stabilizes early; their
+// implementations land in tranches (k) and (l). For now, only Weiszfeld is
+// honored — selecting another kind falls back to Weiszfeld.
+enum class SolverKind : std::uint8_t {
+    Weiszfeld,       // v1, v2 — current behavior
+    VardiZhang,      // v3 — reserved
+    VardiZhangAA,    // v4 — reserved
+};
+
+struct SolverConfig {
+    SolverKind  kind          = SolverKind::Weiszfeld;
+    double      tol           = 1e-9;
+    std::size_t max_iters     = 200;
+    // VardiZhang knobs (ignored for plain Weiszfeld):
+    double      vz_vertex_eps = 1e-8;  // "near a y_i" radius for subgradient correction
+    // Anderson-acceleration knobs (ignored for non-AA kinds):
+    int         aa_window     = 5;
+    double      aa_reg        = 1e-12;
+    bool        aa_safeguard  = true;
+};
+
 struct ClassifierOptions {
     FeatureWeights    weights;  // diag(W); required, no default — see Eq. 4
     UncertaintyConfig uncertainty{};
+    SolverConfig      solver{};
     double            nota_threshold = 0.05;
     int               n_threads = 0;  // 0 == auto (OpenMP runtime default)
 };
