@@ -1,0 +1,139 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "generator": "Ninja",
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Release (CLI + tests, OpenMP)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON"
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Debug + tests",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON"
+            }
+        },
+        {
+            "name": "full",
+            "displayName": "Release + everything (tests, benchmarks, python)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON",
+                "MQCES_ENABLE_BENCHMARKS": "ON",
+                "MQCES_ENABLE_PYTHON": "ON"
+            }
+        },
+        {
+            "name": "asan",
+            "displayName": "AddressSanitizer",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON",
+                "MQCES_ENABLE_SANITIZER": "asan"
+            }
+        },
+        {
+            "name": "ubsan",
+            "displayName": "UndefinedBehaviorSanitizer",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON",
+                "MQCES_ENABLE_SANITIZER": "ubsan"
+            }
+        },
+        {
+            "name": "tsan",
+            "displayName": "ThreadSanitizer",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON",
+                "MQCES_ENABLE_OPENMP": "ON",
+                "MQCES_ENABLE_SANITIZER": "tsan"
+            }
+        },
+        {
+            "name": "coverage",
+            "displayName": "Coverage (gcovr / llvm-cov)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_COVERAGE": "ON"
+            }
+        },
+        {
+            "name": "tidy",
+            "displayName": "clang-tidy (compile-time checks)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "MQCES_ENABLE_TESTS": "ON",
+                "MQCES_ENABLE_CLI": "ON",
+                "MQCES_ENABLE_CLANG_TIDY": "ON"
+            }
+        },
+        {
+            "name": "kokkos-cuda",
+            "displayName": "Kokkos + CUDA backend (compile-only CI check)",
+            "inherits": "base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "MQCES_ENABLE_TESTS": "OFF",
+                "MQCES_ENABLE_CLI": "OFF",
+                "MQCES_ENABLE_KOKKOS": "ON",
+                "MQCES_ENABLE_KOKKOS_CUDA": "ON"
+            }
+        }
+    ],
+    "buildPresets": [
+        { "name": "release",     "configurePreset": "release"     },
+        { "name": "debug",       "configurePreset": "debug"       },
+        { "name": "full",        "configurePreset": "full"        },
+        { "name": "asan",        "configurePreset": "asan"        },
+        { "name": "ubsan",       "configurePreset": "ubsan"       },
+        { "name": "tsan",        "configurePreset": "tsan"        },
+        { "name": "coverage",    "configurePreset": "coverage"    },
+        { "name": "tidy",        "configurePreset": "tidy"        },
+        { "name": "kokkos-cuda", "configurePreset": "kokkos-cuda" }
+    ],
+    "testPresets": [
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "output": { "outputOnFailure": true },
+            "execution": { "noTestsAction": "error", "stopOnFailure": false }
+        },
+        { "name": "debug",    "inherits": "release", "configurePreset": "debug"    },
+        { "name": "full",     "inherits": "release", "configurePreset": "full"     },
+        { "name": "asan",     "inherits": "release", "configurePreset": "asan"     },
+        { "name": "ubsan",    "inherits": "release", "configurePreset": "ubsan"    },
+        { "name": "tsan",     "inherits": "release", "configurePreset": "tsan"     },
+        { "name": "coverage", "inherits": "release", "configurePreset": "coverage" }
+    ]
+}

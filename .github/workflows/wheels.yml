@@ -1,0 +1,56 @@
+name: wheels
+
+on:
+    push:
+        branches: [master]
+        tags: ['v*']
+    pull_request:
+        branches: [master]
+    workflow_dispatch:
+
+jobs:
+    build-wheels:
+        name: ${{ matrix.os }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-22.04, macos-14, windows-2022]
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Build wheels
+              uses: pypa/cibuildwheel@v3.0
+              env:
+                  CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
+                  CIBW_SKIP:  "*-musllinux_* pp*"
+                  CIBW_ARCHS_LINUX:   "x86_64"
+                  CIBW_ARCHS_MACOS:   "arm64"
+                  CIBW_ARCHS_WINDOWS: "AMD64"
+                  CIBW_BUILD_VERBOSITY: "1"
+                  # The OpenMP backend is the default; Kokkos is left off for
+                  # wheel builds. CIBW handles the wheel-side toolchain.
+                  CIBW_ENVIRONMENT: >-
+                      MQCES_WHEEL_BUILD=1
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: wheels-${{ matrix.os }}
+                  path: ./wheelhouse/*.whl
+
+    publish-on-tag:
+        name: Publish to PyPI
+        needs: build-wheels
+        if: startsWith(github.ref, 'refs/tags/v')
+        runs-on: ubuntu-22.04
+        environment: pypi
+        permissions:
+            id-token: write  # OIDC trusted publishing
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: wheels-*
+                  merge-multiple: true
+                  path: dist
+            - uses: pypa/gh-action-pypi-publish@release/v1

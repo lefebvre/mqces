@@ -1,0 +1,35 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "mqces"
+version = "0.1.0"
+description = "Multivariate Quantile Comparison for Environmental Samples (C++20 core, NumPy/nanobind bindings)"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+authors = [{ name = "Jordan P. Lefebvre", email = "lefebvre.jordan@gmail.com" }]
+dependencies = ["numpy>=1.26"]
+
+[project.optional-dependencies]
+test = ["pytest>=8", "numpy>=2.0"]
+
+[tool.scikit-build]
+minimum-version = "0.10"
+cmake.version = ">=3.24"
+cmake.build-type = "Release"
+ninja.make-fallback = true
+wheel.packages = ["python/mqces"]
+wheel.install-dir = "mqces"
+build-dir = "build/{wheel_tag}"
+
+[tool.scikit-build.cmake.define]
+MQCES_ENABLE_PYTHON     = "ON"
+MQCES_ENABLE_TESTS      = "OFF"
+MQCES_ENABLE_CLI        = "OFF"
+MQCES_ENABLE_BENCHMARKS = "OFF"
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]

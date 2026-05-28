@@ -1,0 +1,44 @@
+name: sanitizers
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    sanitizer:
+        name: ${{ matrix.sanitizer }}
+        runs-on: ubuntu-22.04
+        strategy:
+            fail-fast: false
+            matrix:
+                sanitizer: [asan, ubsan, tsan]
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install toolchain
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y ninja-build ccache clang lld llvm libomp-dev python3-dev
+                echo "CC=clang"  >> "$GITHUB_ENV"
+                echo "CXX=clang++" >> "$GITHUB_ENV"
+
+            - uses: hendrikmuhs/ccache-action@v1.2
+              with: { key: san-${{ matrix.sanitizer }} }
+
+            - name: Configure (${{ matrix.sanitizer }})
+              run: cmake --preset ${{ matrix.sanitizer }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+            - name: Build
+              run: cmake --build --preset ${{ matrix.sanitizer }} -j
+
+            - name: Test
+              env:
+                  ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+                  UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+                  TSAN_OPTIONS: halt_on_error=1
+              run: ctest --preset ${{ matrix.sanitizer }} --label-regex unit

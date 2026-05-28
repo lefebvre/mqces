@@ -130,7 +130,11 @@ python3 scripts/refresh_deps.py --apply    # rewrite the .cmake file
 
 ## License
 
-Authorship and licensing inherit from the paper's institutional context
-(ORNL / UT-Battelle, LLC under DOE contract DE-AC05-00OR22725 — see the
-PDF for the manuscript notice). Add an explicit `LICENSE` file before
-publishing.
+Apache License, Version 2.0 — see [LICENSE](LICENSE) for the full text.
+Copyright © 2026 Jordan P. Lefebvre.
+
+The library is a clean-room reimplementation based on the public
+manuscript by Weber & Dayman (ORNL); no code or data from that work is
+incorporated. The paper itself was authored under DOE contract
+DE-AC05-00OR22725 and its own distribution terms apply only to the PDF,
+not to this software.

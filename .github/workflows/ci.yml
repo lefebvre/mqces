@@ -1,0 +1,91 @@
+name: ci
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    build-test:
+        name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.build_type }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ubuntu-22.04, macos-14]
+                compiler: [gcc, clang]
+                build_type: [Debug, Release]
+                exclude:
+                    - os: macos-14
+                      compiler: gcc
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install Linux toolchain
+              if: runner.os == 'Linux'
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y ninja-build ccache libomp-dev python3-dev
+                if [ "${{ matrix.compiler }}" = "clang" ]; then
+                    sudo apt-get install -y clang
+                    echo "CC=clang"  >> "$GITHUB_ENV"
+                    echo "CXX=clang++" >> "$GITHUB_ENV"
+                else
+                    echo "CC=gcc"  >> "$GITHUB_ENV"
+                    echo "CXX=g++" >> "$GITHUB_ENV"
+                fi
+
+            - name: Install macOS toolchain
+              if: runner.os == 'macOS'
+              run: |
+                brew install ninja ccache libomp
+                echo "CC=clang"  >> "$GITHUB_ENV"
+                echo "CXX=clang++" >> "$GITHUB_ENV"
+
+            - name: ccache
+              uses: hendrikmuhs/ccache-action@v1.2
+              with:
+                  key: ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}
+
+            - name: Configure
+              run: |
+                cmake -B build -G Ninja \
+                    -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+                    -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+                    -DMQCES_ENABLE_TESTS=ON \
+                    -DMQCES_ENABLE_CLI=ON
+
+            - name: Build
+              run: cmake --build build -j
+
+            - name: Test
+              run: ctest --test-dir build --output-on-failure --label-regex 'unit|integration'
+
+    kokkos-cuda-compile:
+        name: kokkos+cuda (compile-only)
+        runs-on: ubuntu-22.04
+        container:
+            image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install build deps
+              run: |
+                apt-get update
+                apt-get install -y cmake ninja-build g++ git python3-dev
+            - name: Configure (kokkos+cuda)
+              run: |
+                cmake -B build -G Ninja \
+                    -DCMAKE_BUILD_TYPE=Release \
+                    -DMQCES_ENABLE_TESTS=OFF \
+                    -DMQCES_ENABLE_CLI=OFF \
+                    -DMQCES_ENABLE_KOKKOS=ON \
+                    -DMQCES_ENABLE_KOKKOS_CUDA=ON \
+                    -DKokkos_ARCH_AMPERE80=ON
+            - name: Build (compile only — no GPU runner)
+              run: cmake --build build -j --target mqces

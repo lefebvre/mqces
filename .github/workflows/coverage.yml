@@ -1,0 +1,64 @@
+name: coverage
+
+on:
+    push:
+        branches: [master]
+    pull_request:
+        branches: [master]
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    coverage:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install toolchain
+              run: |
+                sudo apt-get update
+                sudo apt-get install -y ninja-build ccache g++ gcovr libomp-dev python3-dev
+                echo "CC=gcc"  >> "$GITHUB_ENV"
+                echo "CXX=g++" >> "$GITHUB_ENV"
+
+            - uses: hendrikmuhs/ccache-action@v1.2
+              with: { key: coverage }
+
+            - name: Configure
+              run: cmake --preset coverage -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+            - name: Build
+              run: cmake --build --preset coverage -j
+
+            - name: Test
+              run: ctest --preset coverage --label-regex 'unit|integration'
+
+            - name: Generate coverage report
+              run: |
+                gcovr -r . --filter '^mqces/' \
+                    --exclude-throw-branches \
+                    --exclude 'mqces/.*\.hpp\.in$' \
+                    --exclude tests/ \
+                    --exclude benchmarks/ \
+                    --xml coverage.xml \
+                    --html-details coverage.html \
+                    --print-summary
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: coverage-report
+                  path: |
+                      coverage.xml
+                      coverage*.html
+                      coverage.css
+
+            - name: Upload to Codecov
+              if: ${{ env.CODECOV_TOKEN != '' }}
+              env:
+                  CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+              uses: codecov/codecov-action@v5
+              with:
+                  files: coverage.xml
+                  fail_ci_if_error: false
