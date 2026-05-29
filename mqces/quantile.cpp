@@ -269,6 +269,14 @@ RowMajorMatrix spatial_rank(const Sample& x, const SamplingConfig& sampling, dou
 InverseRankResult inverse_spatial_rank(
     const RowMajorMatrix& u, const Sample& y, const SolverConfig& solver)
 {
+    if (y.rows() == 0) {
+        throw std::invalid_argument(
+            "inverse_spatial_rank: y must have at least one row");
+    }
+    if (y.cols() == 0) {
+        throw std::invalid_argument(
+            "inverse_spatial_rank: y must have at least one feature column");
+    }
     if (u.cols() != y.cols()) {
         throw std::invalid_argument(
             "inverse_spatial_rank: u.cols() (" + std::to_string(u.cols())
@@ -303,23 +311,53 @@ InverseRankResult inverse_spatial_rank(
     const SamplingConfig& sampling)
 {
     const auto M = static_cast<std::size_t>(y.rows());
-    if (sampling.reference_size == 0 || sampling.reference_size >= M) {
-        return inverse_spatial_rank(u, y, solver);
-    }
     switch (sampling.strategy) {
-        case SamplingConfig::Strategy::Uniform:
-        case SamplingConfig::Strategy::KdTreeLocalExact: {
-            // KdTreeLocalExact's tree-aware Weiszfeld variant would require
-            // refactoring the solver API to take a cloud accessor instead
-            // of a raw y matrix — scoped out of tranche (o). For now the
-            // strategy falls through to the uniform-subsample path so
-            // similarity_score with KdTreeLocalExact still works
-            // (spatial_rank uses the tree; inverse_spatial_rank uses
-            // uniform R-subset of y).
+        case SamplingConfig::Strategy::Uniform: {
+            if (sampling.reference_size == 0 || sampling.reference_size >= M) {
+                return inverse_spatial_rank(u, y, solver);
+            }
             auto indices
                 = detail::uniform_reference_indices(M, sampling.reference_size, sampling.seed);
             Sample y_refs = detail::gather_rows(y, indices);
             return inverse_spatial_rank(u, y_refs, solver);
+        }
+        case SamplingConfig::Strategy::KdTreeLocalExact: {
+            // Tree-aware inverse Weiszfeld: build the k-d tree of y once
+            // and reuse it across every row of u. Each per-row solve uses
+            // Barnes-Hut traversal of the tree to compute the per-step
+            // Weiszfeld sums in O(k·log M) instead of O(M·d). The
+            // `reference_size` field is intentionally unused for this
+            // strategy; cost is governed by kd_opening_theta and
+            // kd_leaf_size.
+            if (u.cols() != y.cols()) {
+                throw std::invalid_argument(
+                    "inverse_spatial_rank: u.cols() (" + std::to_string(u.cols())
+                    + ") must equal y.cols() (" + std::to_string(y.cols()) + ")");
+            }
+            if (y.rows() == 0) {
+                throw std::invalid_argument(
+                    "inverse_spatial_rank: y must have at least one row");
+            }
+            detail::KdTree    tree(y, sampling.kd_leaf_size);
+            InverseRankResult result;
+            result.x_tilde = RowMajorMatrix::Zero(u.rows(), u.cols());
+            for (Eigen::Index j = 0; j < u.rows(); ++j) {
+                Eigen::VectorXd u_j        = u.row(j).transpose();
+                auto            row_result = detail::solve_inverse_rank_row(
+                    u_j, tree, sampling.kd_opening_theta, solver);
+                if (!row_result.converged) {
+                    throw std::runtime_error(
+                        "inverse_spatial_rank: row " + std::to_string(j)
+                        + " failed to converge after " + std::to_string(row_result.iters)
+                        + " iterations (residual=" + std::to_string(row_result.residual) + ")");
+                }
+                result.x_tilde.row(j) = row_result.x.transpose();
+                result.max_iters_used = std::max(result.max_iters_used, row_result.iters);
+                result.max_residual   = std::max(result.max_residual, row_result.residual);
+                result.aa_fallbacks += row_result.aa_fallbacks;
+                result.aa_restarts  += row_result.aa_restarts;
+            }
+            return result;
         }
         case SamplingConfig::Strategy::Stratified:
         default:

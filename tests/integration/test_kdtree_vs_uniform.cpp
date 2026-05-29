@@ -71,10 +71,10 @@ TEST(KdTreeVsUniform, KdSpatialRankApproachesExactOnFixture)
 }
 
 // similarity_score with KdTreeLocalExact: should produce a finite,
-// deterministic score that's close to the exact score on the fixture.
-// Note that similarity_score's inverse_spatial_rank step falls through
-// to the uniform-subsample path for this strategy (tranche-o scope) —
-// we accept the looser tolerance because of that.
+// deterministic score. Both the spatial_rank and inverse_spatial_rank
+// steps use the k-d tree (Barnes-Hut for the rank computation, tree-aware
+// Weiszfeld for the inverse solve); `reference_size` is intentionally
+// unused under this strategy.
 TEST(KdTreeVsUniform, SimilarityScoreWithKdIsDeterministic)
 {
     const auto w      = load_weights();
@@ -86,7 +86,6 @@ TEST(KdTreeVsUniform, SimilarityScoreWithKdIsDeterministic)
     kd_cfg.strategy         = mqces::SamplingConfig::Strategy::KdTreeLocalExact;
     kd_cfg.kd_opening_theta = 0.3;
     kd_cfg.kd_leaf_size     = 8;
-    kd_cfg.reference_size   = 25;   // for the inverse_spatial_rank fallback path
 
     const double s1 = mqces::similarity_score(x, y, w, solver, kd_cfg);
     const double s2 = mqces::similarity_score(x, y, w, solver, kd_cfg);

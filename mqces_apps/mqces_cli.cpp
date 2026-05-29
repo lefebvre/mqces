@@ -229,8 +229,13 @@ int main(int argc, char** argv)
                 return 2;
             }
             try {
-                reference_size_override
-                    = static_cast<std::size_t>(std::stoll(argv[++i]));
+                const long long parsed = std::stoll(argv[++i]);
+                if (parsed < 0) {
+                    std::cerr << "error: --reference-size must be non-negative "
+                                 "(got " << parsed << ")\n";
+                    return 2;
+                }
+                reference_size_override = static_cast<std::size_t>(parsed);
             } catch (const std::exception&) {
                 std::cerr << "error: --reference-size value is not an integer\n";
                 return 2;

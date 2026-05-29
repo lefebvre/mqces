@@ -43,3 +43,13 @@ add_custom_command(
 )
 add_custom_target(mqces_python_init ALL DEPENDS "${_mqces_init_dst}")
 add_dependencies(_mqces_core mqces_python_init)
+
+# Install rule for wheel-builds (scikit-build-core). pyproject.toml sets
+# wheel.install-dir = "mqces", so installing _mqces_core to "." places the
+# compiled extension next to __init__.py inside the wheel's mqces/ package.
+# Without this rule the wheel contains the pure-Python wrapper but no .so,
+# and `import mqces` fails at the `from . import _mqces_core` line.
+install(TARGETS _mqces_core
+    LIBRARY DESTINATION .
+    RUNTIME DESTINATION .
+)

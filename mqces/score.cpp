@@ -25,7 +25,8 @@ double weighted_sq_distance(
 // overload. Plain Weiszfeld plateaus around 1e-6 to 1e-7 when iterates
 // approach a y_i; the loose tol matches the precision of the downstream
 // sum-of-weighted-squared-distances score and avoids spurious failures.
-// A switch to Vardi-Zhang (tranche k) lets us tighten this back to 1e-9.
+// Callers wanting a tighter solution (1e-9) should pass an explicit
+// SolverConfig with kind=VardiZhang or VardiZhangAA.
 SolverConfig score_default_solver()
 {
     SolverConfig c;
@@ -40,6 +41,15 @@ SolverConfig score_default_solver()
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights,
                         const SolverConfig& solver, const SamplingConfig& sampling)
 {
+    if (x.rows() == 0 || y.rows() == 0) {
+        throw std::invalid_argument(
+            "similarity_score: both samples must have at least one row (got x.rows()="
+            + std::to_string(x.rows()) + ", y.rows()=" + std::to_string(y.rows()) + ")");
+    }
+    if (x.cols() == 0) {
+        throw std::invalid_argument(
+            "similarity_score: samples must have at least one feature column");
+    }
     if (x.cols() != y.cols()) {
         throw std::invalid_argument(
             "similarity_score: x.cols() (" + std::to_string(x.cols())

@@ -4,6 +4,7 @@
 set(MQCES_BENCHMARKS
     bench_spatial_rank.cpp
     bench_inverse_rank.cpp
+    bench_inverse_kdtree.cpp
     bench_score.cpp
     bench_classify_end_to_end.cpp
     bench_parallel_scaling.cpp
