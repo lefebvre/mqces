@@ -36,4 +36,30 @@ ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
 }  // namespace v2
 
+// v3 — paired-difference t-statistic (as in v2) but the inner inverse-rank
+// solver is Vardi-Zhang (Vardi & Zhang 2000) instead of plain Weiszfeld.
+// VZ closes the residual-plateau pathology that forces v1/v2 to use a
+// loose Weiszfeld tolerance, so v3 scores are reproducible to ~1e-9
+// regardless of whether iterates hover near a vertex y_i.
+//
+// Caller-provided options.solver is honored, defaulting to a tight VZ
+// config inside the classifier when unset (mc_samples / nota / sampling
+// behavior matches v2).
+namespace v3 {
+ClassificationResult classify(
+    const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
+}  // namespace v3
+
+// v4 — same statistics as v3 (paired-difference t) and same Vardi-Zhang
+// subgradient correction, plus Type-II Anderson acceleration over a
+// rolling window of past iterates. AA converts VZ's linear convergence
+// into superlinear when the problem is amenable, and the safeguarded
+// fallback (Toth-Kelley 2015) prevents pathological divergence by
+// reverting to plain VZ whenever an accelerated step inflates the
+// residual. This is the production-target variant at N = 10⁶ scale.
+namespace v4 {
+ClassificationResult classify(
+    const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
+}  // namespace v4
+
 }  // namespace mqces

@@ -38,3 +38,32 @@ static void BM_SpatialRank(benchmark::State& state)
     state.SetLabel("N×N pair evaluations");
 }
 BENCHMARK(BM_SpatialRank)->Arg(50)->Arg(100)->Arg(250)->Arg(500)->Arg(1000);
+
+// Approximate path: spatial_rank_approx with reference_size = R. The
+// cost is O(N·R) instead of O(N²). At N=10⁴, the R=500 case should be
+// ~20× faster than the R=N=10⁴ exact baseline.
+static void BM_SpatialRankApprox(benchmark::State& state)
+{
+    const int n = static_cast<int>(state.range(0));
+    const int R = static_cast<int>(state.range(1));
+    const int d = 9;
+    const auto x = random_sample(n, d, 0xC0DEU);
+
+    mqces::SamplingConfig cfg;
+    cfg.reference_size = static_cast<std::size_t>(R);
+    cfg.seed           = 0x1234U;
+
+    for (auto _ : state) {
+        auto u = mqces::spatial_rank(x, cfg);
+        benchmark::DoNotOptimize(u);
+    }
+    state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(n) * R);
+    state.counters["N"] = n;
+    state.counters["R"] = R;
+}
+// Cross-product: query count × reference count. Includes a few "R == N"
+// points so the approx path's behavior at the dispatch-to-exact boundary
+// is captured (sampling.reference_size >= N falls through to the exact
+// kernel).
+BENCHMARK(BM_SpatialRankApprox)
+    ->ArgsProduct({{1000, 5000, 10000}, {100, 500, 1000}});

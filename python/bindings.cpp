@@ -101,7 +101,8 @@ mqces::FeatureWeights to_weights(
 mqces::ClassifierOptions build_options(
     const nb::ndarray<double, nb::c_contig>& weights_arr, Eigen::Index expected_d,
     double epsilon, std::size_t mc_samples, std::uint64_t seed,
-    double nota_threshold, int n_threads)
+    double nota_threshold, int n_threads,
+    std::size_t reference_size, std::uint64_t sampling_seed)
 {
     mqces::ClassifierOptions o;
     o.weights                   = to_weights(weights_arr, expected_d);
@@ -110,6 +111,8 @@ mqces::ClassifierOptions build_options(
     o.uncertainty.seed          = seed;
     o.nota_threshold            = nota_threshold;
     o.n_threads                 = n_threads;
+    o.sampling.reference_size   = reference_size;
+    o.sampling.seed             = sampling_seed;
     return o;
 }
 
@@ -137,11 +140,14 @@ nb::dict classify_wrapper(
     std::size_t                                                                    mc_samples,
     std::uint64_t                                                                  seed,
     double                                                                         nota_threshold,
-    int                                                                            n_threads)
+    int                                                                            n_threads,
+    std::size_t                                                                    reference_size,
+    std::uint64_t                                                                  sampling_seed)
 {
     mqces::Sample test = to_sample(test_arr, "test");
     auto          opts = build_options(weights_arr, test.cols(), epsilon,
-                                       mc_samples, seed, nota_threshold, n_threads);
+                                       mc_samples, seed, nota_threshold, n_threads,
+                                       reference_size, sampling_seed);
     auto          cs   = to_classes(classes);
     std::span<const mqces::Class> known(cs);
     return result_to_dict(Classify(test, known, opts));
@@ -154,6 +160,8 @@ NB_MODULE(_mqces_core, m)
     m.doc()                  = "nanobind bindings for mqces";
     m.attr("__version__")    = mqces::version_string;
 
+    constexpr auto sampling_default_seed = std::uint64_t{0xACEBEEFULL};
+
     m.def("classify_classic", &classify_wrapper<mqces::classic::classify>,
           nb::arg("test"), nb::arg("classes"), nb::arg("weights"),
           nb::arg("epsilon")        = 0.0,
@@ -161,6 +169,8 @@ NB_MODULE(_mqces_core, m)
           nb::arg("seed")           = std::uint64_t{0xC0FFEE},
           nb::arg("nota_threshold") = 0.05,
           nb::arg("n_threads")      = 0,
+          nb::arg("reference_size") = std::size_t{0},
+          nb::arg("sampling_seed")  = sampling_default_seed,
           "Run mqces::classic::classify and return a dict result.");
 
     m.def("classify_v2", &classify_wrapper<mqces::v2::classify>,
@@ -170,7 +180,31 @@ NB_MODULE(_mqces_core, m)
           nb::arg("seed")           = std::uint64_t{0xC0FFEE},
           nb::arg("nota_threshold") = 0.05,
           nb::arg("n_threads")      = 0,
+          nb::arg("reference_size") = std::size_t{0},
+          nb::arg("sampling_seed")  = sampling_default_seed,
           "Run mqces::v2::classify and return a dict result.");
+
+    m.def("classify_v3", &classify_wrapper<mqces::v3::classify>,
+          nb::arg("test"), nb::arg("classes"), nb::arg("weights"),
+          nb::arg("epsilon")        = 0.0,
+          nb::arg("mc_samples")     = 10,
+          nb::arg("seed")           = std::uint64_t{0xC0FFEE},
+          nb::arg("nota_threshold") = 0.05,
+          nb::arg("n_threads")      = 0,
+          nb::arg("reference_size") = std::size_t{0},
+          nb::arg("sampling_seed")  = sampling_default_seed,
+          "Run mqces::v3::classify (paired-difference t + Vardi-Zhang solver).");
+
+    m.def("classify_v4", &classify_wrapper<mqces::v4::classify>,
+          nb::arg("test"), nb::arg("classes"), nb::arg("weights"),
+          nb::arg("epsilon")        = 0.0,
+          nb::arg("mc_samples")     = 10,
+          nb::arg("seed")           = std::uint64_t{0xC0FFEE},
+          nb::arg("nota_threshold") = 0.05,
+          nb::arg("n_threads")      = 0,
+          nb::arg("reference_size") = std::size_t{0},
+          nb::arg("sampling_seed")  = sampling_default_seed,
+          "Run mqces::v4::classify (VZ + Anderson acceleration).");
 
     m.def("similarity_score",
           [](const nb::ndarray<double, nb::c_contig>& x,

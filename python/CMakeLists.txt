@@ -29,6 +29,27 @@ set_target_properties(_mqces_core PROPERTIES
 
 # Copy the pure-Python wrapper next to the compiled .so so a developer can
 # run `PYTHONPATH=build/python python -m pytest python/tests` against the
-# in-tree build.
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/mqces/__init__.py
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/mqces)
+# in-tree build. Wired via add_custom_command so edits to the source
+# __init__.py trigger a re-copy on the next build (file(COPY ...) only
+# runs at configure time and goes stale).
+set(_mqces_init_src "${CMAKE_CURRENT_SOURCE_DIR}/mqces/__init__.py")
+set(_mqces_init_dst "${CMAKE_CURRENT_BINARY_DIR}/mqces/__init__.py")
+add_custom_command(
+    OUTPUT  "${_mqces_init_dst}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+            "${_mqces_init_src}" "${_mqces_init_dst}"
+    DEPENDS "${_mqces_init_src}"
+    COMMENT "Syncing python/mqces/__init__.py to build dir"
+)
+add_custom_target(mqces_python_init ALL DEPENDS "${_mqces_init_dst}")
+add_dependencies(_mqces_core mqces_python_init)
+
+# Install rule for wheel-builds (scikit-build-core). pyproject.toml sets
+# wheel.install-dir = "mqces", so installing _mqces_core to "." places the
+# compiled extension next to __init__.py inside the wheel's mqces/ package.
+# Without this rule the wheel contains the pure-Python wrapper but no .so,
+# and `import mqces` fails at the `from . import _mqces_core` line.
+install(TARGETS _mqces_core
+    LIBRARY DESTINATION .
+    RUNTIME DESTINATION .
+)

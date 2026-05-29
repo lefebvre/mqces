@@ -9,25 +9,47 @@
 #include <algorithm>
 #include <cmath>
 #include <span>
+#include <utility>
+#include <vector>
 
-// v2 differences vs classic:
+// v3 differences vs v2:
 //
-//   * The t-statistic is computed on paired per-replicate differences
-//       d_i = S(T, X_{runner-up,i}) − S(T, X_{best,i})
-//     using the same MC seeds (so the two scores share their noise
-//     realization). This is both more powerful and methodologically
-//     correct: in classic, X̄_j and X̄_k are computed against the same
-//     test sample and are NOT independent, so the (s_j² + s_k²)/N
-//     denominator overstates the standard error of the mean difference.
-//   * Reported probability is Pr(T_paired ≤ 0) — the probability that on
-//     a fresh replicate the runner-up would have scored at least as low
-//     as the chosen best. This preserves the sign of the difference
-//     (classic's 1 - cdf(t) inverts the geometric meaning when the
-//     reported "best" actually has a higher mean than the runner-up
-//     in the test sample, which classic can never observe — but it
-//     does matter for downstream NOTA reasoning).
+//   * Same paired-difference t-statistic as v2 (the corrected misclass
+//     probability), so any best_class agreement / disagreement vs v2 is
+//     purely solver-driven, not statistics-driven.
+//   * Inner solver is Vardi-Zhang, which subgradient-corrects the
+//     iterate when it hovers near some y_{i*}. Plain Weiszfeld plateaus
+//     there at residual ~1e-6 to ~1e-7; VZ converges to the configured
+//     tol (default 1e-9 here, vs the loose 1e-5 v1/v2 use).
+//   * The same MC machinery as v2 — collect_replicate_scores does the
+//     parallel replicate loop, only the SolverConfig differs.
 
-namespace mqces::v2 {
+namespace mqces::v3 {
+
+namespace {
+
+SolverConfig default_solver_for_v3(const ClassifierOptions& options)
+{
+    // Honor an explicit VardiZhang / VardiZhangAA override verbatim.
+    // When the caller hasn't customized the solver (kind == Weiszfeld,
+    // which is SolverConfig's global default), stamp in v3's tight-VZ
+    // defaults: tol=1e-7 with max_iters=500. VZ converges much tighter
+    // than plain Weiszfeld in principle, but on small-d clustered inputs
+    // some configurations still need a few hundred iterations to reach
+    // the tight tol — 200 (the global default) isn't enough.
+    if (options.solver.kind == SolverKind::VardiZhang
+        || options.solver.kind == SolverKind::VardiZhangAA) {
+        return options.solver;
+    }
+    SolverConfig s;
+    s.kind          = SolverKind::VardiZhang;
+    s.tol           = 1e-7;
+    s.max_iters     = 500;
+    s.vz_vertex_eps = options.solver.vz_vertex_eps;
+    return s;
+}
+
+}  // namespace
 
 ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options)
@@ -37,8 +59,9 @@ ClassificationResult classify(
     const auto K = static_cast<Eigen::Index>(known.size());
     const auto N = static_cast<Eigen::Index>(options.uncertainty.mc_samples);
 
-    const Eigen::MatrixXd scores = detail::collect_replicate_scores(
-        test, known, options, detail::classic_solver_config());
+    const SolverConfig solver = default_solver_for_v3(options);
+    const Eigen::MatrixXd scores
+        = detail::collect_replicate_scores(test, known, options, solver);
 
     Eigen::VectorXd means(K);
     for (Eigen::Index k = 0; k < K; ++k) {
@@ -64,7 +87,7 @@ ClassificationResult classify(
 
     if (K >= 2) {
         const Eigen::Index runner_up = ranking[1].second;
-        // Paired differences: d_i = score_{runner_up,i} − score_{best,i}.
+        // Paired-difference t-statistic: same as v2.
         Eigen::ArrayXd d = scores.row(runner_up).array() - scores.row(best_idx).array();
         const double   mean_d = d.mean();
         double         var_d  = 0.0;
@@ -75,10 +98,6 @@ ClassificationResult classify(
         if (se > 0.0 && std::isfinite(se)) {
             const double t  = mean_d / se;
             const double df = static_cast<double>(N - 1);
-            // Pr(T_paired ≤ 0): probability the runner-up would have scored
-            // at least as low as best. With mean_d > 0 (runner-up worse), this
-            // is the left tail; with mean_d < 0 (impossible by construction
-            // since best has the lowest mean), it would exceed 0.5.
             result.misclassification_prob = detail::students_t_cdf(-t, df);
         } else {
             result.misclassification_prob = (mean_d == 0.0) ? 0.5 : 0.0;
@@ -92,4 +111,4 @@ ClassificationResult classify(
     return result;
 }
 
-}  // namespace mqces::v2
+}  // namespace mqces::v3
