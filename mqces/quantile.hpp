@@ -40,6 +40,10 @@ struct InverseRankResult {
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> x_tilde;
     std::size_t                                                            max_iters_used = 0;
     double                                                                 max_residual = 0.0;
+    // Aggregated across all rows when using SolverKind::VardiZhangAA.
+    // Zero for other solver kinds.
+    std::size_t                                                            aa_fallbacks = 0;
+    std::size_t                                                            aa_restarts  = 0;
 };
 
 // Overload accepting an explicit SolverConfig (preferred new surface).

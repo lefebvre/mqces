@@ -28,6 +28,7 @@ set(MQCES_SOURCES
     classify_classic.cpp
     classify_v2.cpp
     classify_v3.cpp
+    classify_v4.cpp
     nota.cpp
 )
 

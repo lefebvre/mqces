@@ -14,12 +14,14 @@ set(MQCES_UNIT_TESTS
     unit/test_spatial_rank_approx.cpp
     unit/test_inverse_rank.cpp
     unit/test_inverse_vz.cpp
+    unit/test_inverse_vz_aa.cpp
     unit/test_score.cpp
     unit/test_uncertainty.cpp
     unit/test_parallel_shim.cpp
     unit/test_classify_classic.cpp
     unit/test_classify_v2.cpp
     unit/test_classify_v3.cpp
+    unit/test_classify_v4.cpp
     unit/test_nota.cpp
 )
 

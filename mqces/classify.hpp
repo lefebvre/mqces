@@ -50,4 +50,16 @@ ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
 }  // namespace v3
 
+// v4 — same statistics as v3 (paired-difference t) and same Vardi-Zhang
+// subgradient correction, plus Type-II Anderson acceleration over a
+// rolling window of past iterates. AA converts VZ's linear convergence
+// into superlinear when the problem is amenable, and the safeguarded
+// fallback (Toth-Kelley 2015) prevents pathological divergence by
+// reverting to plain VZ whenever an accelerated step inflates the
+// residual. This is the production-target variant at N = 10⁶ scale.
+namespace v4 {
+ClassificationResult classify(
+    const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
+}  // namespace v4
+
 }  // namespace mqces

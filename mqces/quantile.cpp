@@ -236,6 +236,8 @@ InverseRankResult inverse_spatial_rank(
         result.x_tilde.row(j) = row_result.x.transpose();
         result.max_iters_used = std::max(result.max_iters_used, row_result.iters);
         result.max_residual   = std::max(result.max_residual, row_result.residual);
+        result.aa_fallbacks += row_result.aa_fallbacks;
+        result.aa_restarts  += row_result.aa_restarts;
     }
     return result;
 }
