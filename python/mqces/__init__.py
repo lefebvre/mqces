@@ -50,6 +50,14 @@ def _normalize_classes(
     return [(name, np.ascontiguousarray(arr, dtype=np.float64)) for name, arr in items]
 
 
+_VARIANT_DISPATCH = {
+    "classic": "classify_classic",
+    "v2":      "classify_v2",
+    "v3":      "classify_v3",
+    "v4":      "classify_v4",
+}
+
+
 def classify(
     test: np.ndarray,
     classes: Iterable[tuple[str, np.ndarray]] | dict[str, np.ndarray],
@@ -60,7 +68,9 @@ def classify(
     seed: int = 0xC0FFEE,
     nota_threshold: float = 0.05,
     n_threads: int = 0,
-    variant: Literal["classic", "v2"] = "classic",
+    reference_size: int = 0,
+    sampling_seed: int = 0xACEBEEF,
+    variant: Literal["classic", "v2", "v3", "v4"] = "classic",
 ) -> ClassificationResult:
     """Classify ``test`` against ``classes`` using the mqces method.
 
@@ -73,10 +83,19 @@ def classify(
         Each ``specimens`` array must have the same ``n_features`` as ``test``.
     weights
         ``(n_features,)`` diagonal of the W matrix in Eq. 3.
+    reference_size
+        When > 0, switches spatial_rank and inverse_spatial_rank to the
+        O(N·R) subsample-based approximation with ``R = reference_size``
+        uniform references per cloud. ``0`` (default) uses the exact
+        O(N²) kernel.
+    sampling_seed
+        Deterministic seed used to pick the reference subset.
     variant
-        ``"classic"`` reproduces the paper's Eqs. 5-7 verbatim; ``"v2"``
-        uses the paired-difference t-statistic on per-replicate score
-        deltas (see deviations.md).
+        - ``"classic"`` — paper-faithful Eqs. 5-7.
+        - ``"v2"``      — paired-difference t-statistic, Weiszfeld solver.
+        - ``"v3"``      — paired t + Vardi-Zhang solver.
+        - ``"v4"``      — paired t + VZ + Anderson acceleration
+                          (production target at N = 10⁶ scale).
     """
     test_arr    = np.ascontiguousarray(test, dtype=np.float64)
     weights_arr = np.ascontiguousarray(weights, dtype=np.float64)
@@ -85,8 +104,11 @@ def classify(
     if weights_arr.ndim != 1 or weights_arr.shape[0] != test_arr.shape[1]:
         raise ValueError(
             f"weights must be 1-D with length {test_arr.shape[1]}, got {weights_arr.shape}")
+    if variant not in _VARIANT_DISPATCH:
+        raise ValueError(
+            f"variant must be one of {sorted(_VARIANT_DISPATCH)}, got {variant!r}")
 
-    fn = _core.classify_classic if variant == "classic" else _core.classify_v2
+    fn = getattr(_core, _VARIANT_DISPATCH[variant])
     return _wrap_result(fn(
         test=test_arr,
         classes=_normalize_classes(classes),
@@ -96,6 +118,8 @@ def classify(
         seed=seed,
         nota_threshold=nota_threshold,
         n_threads=n_threads,
+        reference_size=reference_size,
+        sampling_seed=sampling_seed,
     ))
 
 

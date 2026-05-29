@@ -9,15 +9,24 @@ C++20 reimplementation and extension of the classification method described in:
 The paper PDF is **not committed**. Drop a copy at `mqces.pdf` in the repo root
 to keep it next to the code locally (`.pdf` is gitignored).
 
-The library ships two classifier variants in parallel:
+The library ships four classifier variants in parallel along two axes
+(t-statistic and inner solver):
 
-| Namespace | What it does |
-|-----------|--------------|
-| `mqces::classic` | Reproduces the paper's Eqs. 1–9 verbatim, including the independent-samples *t*-statistic for misclassification (Eq. 6 of the paper). |
-| `mqces::v2`      | Uses a paired-difference *t*-statistic on per-replicate score deltas, correcting the independence assumption in `classic`. Same selection rule (argmin of mean score), different uncertainty quantification. |
+| Namespace | t-statistic | Inner solver | Notes |
+|---|---|---|---|
+| `mqces::classic` | independent-samples (Eq. 6) | Weiszfeld (loose) | Paper-faithful reference. |
+| `mqces::v2`      | paired-difference | Weiszfeld (loose) | Corrected statistics. |
+| `mqces::v3`      | paired-difference | **Vardi-Zhang** | Subgradient correction at vertices → tight `~1e-7` convergence with no plateau. |
+| `mqces::v4`      | paired-difference | **VZ + Anderson** | Acceleration on top of v3. Production target at N = 10⁶ scale. |
 
-Both share the `similarity_score` primitive (Eq. 3), the Monte-Carlo
-measurement-error sampler (Eq. 10), and a Student's-*t*-based
+Orthogonally, every variant honors a `SamplingConfig` with
+`reference_size = R`: when `R > 0`, both `spatial_rank` and
+`inverse_spatial_rank` switch from O(N²) to O(N·R) cost using a
+deterministic uniform subsample of size R. At N = 10⁶ and R = 10⁴, this
+is the ~100× wall-time win that makes million-row inputs tractable.
+
+All variants share the `similarity_score` primitive (Eq. 3), the
+Monte-Carlo measurement-error sampler (Eq. 10), and a Student's-*t*-based
 none-of-the-above (NOTA) decision.
 
 ## Layout
@@ -88,10 +97,15 @@ The `mqces` CLI consumes JSON describing the test sample, known classes,
 options, and chosen variant, and emits a classification result as JSON.
 
 ```bash
+# Default (input.options.variant decides; falls back to classic).
 mqces --pretty input.json
+
+# Pick v4 (VZ + Anderson) and subsample with R = 10000 references.
+mqces --variant v4 --reference-size 10000 --pretty input.json
 ```
 
-Input schema is documented at the top of
+Input schema (including `variant`, `reference_size`, and solver kwargs)
+is documented at the top of
 [mqces_apps/mqces_cli.cpp](mqces_apps/mqces_cli.cpp).
 
 ## Python bindings
@@ -113,7 +127,9 @@ result = mqces.classify(
     classes=[("t=10", np.array([...])), ...],
     weights=np.array([...]),
     epsilon=0.01, mc_samples=10, seed=42,
-    variant="classic",       # or "v2"
+    variant="v4",            # "classic" | "v2" | "v3" | "v4"
+    reference_size=10000,    # 0 = exact; > 0 = O(N·R) subsample
+    sampling_seed=0xACEBEEF,
 )
 print(result.best_class, result.misclassification_prob)
 ```

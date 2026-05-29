@@ -18,9 +18,20 @@
 //       "seed":            42,                         // optional
 //       "nota_threshold":  0.05,                       // optional, default 0.05
 //       "n_threads":       0,                          // optional, default auto
-//       "variant":         "classic" | "v2"            // optional, default classic
+//       "variant":         "classic"|"v2"|"v3"|"v4",   // optional, default classic
+//       "reference_size":  0,                          // optional, 0 == exact
+//       "sampling_seed":   0xACEBEEF,                  // optional
+//       "solver_tol":      1e-7,                       // optional, solver-dep
+//       "solver_max_iters": 500,                       // optional
+//       "vz_vertex_eps":   1e-6,                       // optional, v3/v4 only
+//       "aa_window":       5,                          // optional, v4 only
+//       "aa_reg":          1e-12                       // optional, v4 only
 //     }
 //   }
+//
+// Command-line flags override the corresponding JSON option:
+//   --variant <name>           overrides options.variant
+//   --reference-size <N>       overrides options.reference_size
 //
 // Output schema:
 //   {
@@ -28,7 +39,7 @@
 //     "scores":                 [{ "class_name": "...", "s_xy": 0.001 }, ...],
 //     "misclassification_prob": 0.018,
 //     "none_of_the_above":      false,
-//     "variant":                "classic" | "v2"
+//     "variant":                "classic"|"v2"|"v3"|"v4"
 //   }
 
 #include <mqces/classify.hpp>
@@ -39,9 +50,11 @@
 
 #include <Eigen/Core>
 
+#include <cstddef>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -56,10 +69,14 @@ void print_usage(std::ostream& os, const char* argv0)
     os << "usage: " << argv0 << " [options] <input.json>\n"
        << "\n"
        << "Options:\n"
-       << "  -o, --output <file>   Write JSON result to <file> (default: stdout).\n"
-       << "      --pretty          Pretty-print the JSON output (indent=2).\n"
-       << "  -h, --help            Show this message and exit.\n"
-       << "  -V, --version         Print mqces version and exit.\n";
+       << "  -o, --output <file>          Write JSON result to <file> (default: stdout).\n"
+       << "      --pretty                 Pretty-print the JSON output (indent=2).\n"
+       << "      --variant <name>         Override input.options.variant\n"
+       << "                               (classic|v2|v3|v4).\n"
+       << "      --reference-size <N>     Override input.options.reference_size\n"
+       << "                               (0 == exact).\n"
+       << "  -h, --help                   Show this message and exit.\n"
+       << "  -V, --version                Print mqces version and exit.\n";
 }
 
 mqces::Sample parse_sample(const json& j, const char* what)
@@ -99,8 +116,13 @@ struct ParsedInput {
     mqces::Sample             test;
     std::vector<mqces::Class> classes;
     mqces::ClassifierOptions  options;
-    std::string               variant;  // "classic" | "v2"
+    std::string               variant;  // "classic" | "v2" | "v3" | "v4"
 };
+
+bool is_known_variant(const std::string& v)
+{
+    return v == "classic" || v == "v2" || v == "v3" || v == "v4";
+}
 
 ParsedInput parse_input(const json& j)
 {
@@ -130,9 +152,25 @@ ParsedInput parse_input(const json& j)
     in.options.n_threads      = opt.value("n_threads", in.options.n_threads);
     in.variant                = opt.value("variant", std::string{"classic"});
 
-    if (in.variant != "classic" && in.variant != "v2") {
+    // SamplingConfig.
+    in.options.sampling.reference_size
+        = opt.value("reference_size", in.options.sampling.reference_size);
+    in.options.sampling.seed = opt.value("sampling_seed", in.options.sampling.seed);
+
+    // SolverConfig — leave kind alone (each classifier variant picks its
+    // own default if not overridden by the user). Other fields apply
+    // uniformly across variants.
+    in.options.solver.tol          = opt.value("solver_tol", in.options.solver.tol);
+    in.options.solver.max_iters    = opt.value("solver_max_iters", in.options.solver.max_iters);
+    in.options.solver.vz_vertex_eps
+        = opt.value("vz_vertex_eps", in.options.solver.vz_vertex_eps);
+    in.options.solver.aa_window    = opt.value("aa_window", in.options.solver.aa_window);
+    in.options.solver.aa_reg       = opt.value("aa_reg", in.options.solver.aa_reg);
+
+    if (!is_known_variant(in.variant)) {
         throw std::runtime_error(
-            "options.variant: must be \"classic\" or \"v2\" (got \"" + in.variant + "\")");
+            "options.variant: must be one of classic|v2|v3|v4 (got \""
+            + in.variant + "\")");
     }
     return in;
 }
@@ -155,9 +193,11 @@ json result_to_json(const mqces::ClassificationResult& r, const std::string& var
 
 int main(int argc, char** argv)
 {
-    std::string input_path;
-    std::string output_path;
-    bool        pretty = false;
+    std::string                input_path;
+    std::string                output_path;
+    bool                       pretty = false;
+    std::optional<std::string> variant_override;
+    std::optional<std::size_t> reference_size_override;
 
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
@@ -177,6 +217,24 @@ int main(int argc, char** argv)
                 return 2;
             }
             output_path = argv[++i];
+        } else if (a == "--variant") {
+            if (i + 1 >= argc) {
+                std::cerr << "error: " << a << " requires a name\n";
+                return 2;
+            }
+            variant_override = argv[++i];
+        } else if (a == "--reference-size") {
+            if (i + 1 >= argc) {
+                std::cerr << "error: " << a << " requires an integer\n";
+                return 2;
+            }
+            try {
+                reference_size_override
+                    = static_cast<std::size_t>(std::stoll(argv[++i]));
+            } catch (const std::exception&) {
+                std::cerr << "error: --reference-size value is not an integer\n";
+                return 2;
+            }
         } else if (!a.empty() && a.front() == '-') {
             std::cerr << "error: unknown flag '" << a << "'\n";
             print_usage(std::cerr, argv[0]);
@@ -216,13 +274,30 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    // Apply CLI overrides on top of the JSON-derived options.
+    if (variant_override) {
+        if (!is_known_variant(*variant_override)) {
+            std::cerr << "error: --variant must be classic|v2|v3|v4 (got \""
+                      << *variant_override << "\")\n";
+            return 2;
+        }
+        parsed.variant = *variant_override;
+    }
+    if (reference_size_override) {
+        parsed.options.sampling.reference_size = *reference_size_override;
+    }
+
     mqces::ClassificationResult result;
     try {
         const std::span<const mqces::Class> known(parsed.classes);
         if (parsed.variant == "classic") {
             result = mqces::classic::classify(parsed.test, known, parsed.options);
-        } else {
+        } else if (parsed.variant == "v2") {
             result = mqces::v2::classify(parsed.test, known, parsed.options);
+        } else if (parsed.variant == "v3") {
+            result = mqces::v3::classify(parsed.test, known, parsed.options);
+        } else {  // v4 (validated above)
+            result = mqces::v4::classify(parsed.test, known, parsed.options);
         }
     } catch (const std::exception& e) {
         std::cerr << "error: classification failed: " << e.what() << "\n";
