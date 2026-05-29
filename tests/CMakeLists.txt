@@ -12,6 +12,7 @@ set(MQCES_UNIT_TESTS
     unit/test_spatial_rank.cpp
     unit/test_spatial_rank_gemm.cpp
     unit/test_spatial_rank_approx.cpp
+    unit/test_kdtree.cpp
     unit/test_inverse_rank.cpp
     unit/test_inverse_vz.cpp
     unit/test_inverse_vz_aa.cpp
@@ -56,6 +57,7 @@ set(MQCES_INTEGRATION_TESTS
     integration/test_paper_table1.cpp
     integration/test_sampling_score_drift.cpp
     integration/test_solver_score_parity.cpp
+    integration/test_kdtree_vs_uniform.cpp
 )
 
 foreach(_src IN LISTS MQCES_INTEGRATION_TESTS)

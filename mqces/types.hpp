@@ -65,13 +65,29 @@ struct SolverConfig {
 
 // Reference-subset approximation for spatial_rank / inverse_spatial_rank.
 // `reference_size == 0` means "exact" (use all N points); positive values
-// switch to the O(N·R) approximate kernels. Stratified is reserved for a
-// later refinement; today only Uniform is honored.
+// switch to the O(N·R) approximate kernels. Strategies:
+//
+//   - Uniform: random R-subset, O(N·R) cost. Default.
+//   - Stratified: reserved for a future refinement.
+//   - KdTreeLocalExact: Barnes-Hut traversal over a balanced k-d tree of
+//     the cloud. Nearby points contribute exactly; subtrees that subtend
+//     a small angle from the query (controlled by `kd_opening_theta`)
+//     contribute via their centroid + count (multipole-zero
+//     approximation). The `reference_size` field is unused for this
+//     strategy — the cost is determined by `kd_opening_theta` and
+//     `kd_leaf_size` instead.
 struct SamplingConfig {
-    enum class Strategy : std::uint8_t { Uniform, Stratified };
-    std::size_t   reference_size = 0;            // 0 == exact
-    Strategy      strategy       = Strategy::Uniform;
-    std::uint64_t seed           = 0xACEBEEFULL;
+    enum class Strategy : std::uint8_t {
+        Uniform,
+        Stratified,
+        KdTreeLocalExact,
+    };
+    std::size_t   reference_size   = 0;          // 0 == exact (Uniform path)
+    Strategy      strategy         = Strategy::Uniform;
+    std::uint64_t seed             = 0xACEBEEFULL;
+    // K-d tree knobs (only meaningful when strategy == KdTreeLocalExact):
+    double        kd_opening_theta = 0.5;   // Barnes-Hut opening criterion
+    std::size_t   kd_leaf_size     = 32;    // max points per leaf node
 };
 
 struct ClassifierOptions {

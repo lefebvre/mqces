@@ -1,6 +1,7 @@
 #include <mqces/quantile.hpp>
 
 #include <mqces/detail/inverse_solvers.hpp>
+#include <mqces/detail/kdtree.hpp>
 #include <mqces/detail/reference_sample.hpp>
 
 #include <Eigen/Core>
@@ -194,20 +195,75 @@ RowMajorMatrix spatial_rank_approx_uniform(
     return u;
 }
 
+// K-d tree Barnes-Hut approximation of spatial_rank. For each query row,
+// traverse a balanced k-d tree of the full cloud and accumulate exact
+// (x_j − x_i)/d contributions for "near" points and centroid-summarized
+// contributions for "far" subtrees. Divisor is N (the full cloud size),
+// matching Eq. 1's convention.
+RowMajorMatrix spatial_rank_kdtree(
+    const Sample& x, double opening_theta, std::size_t leaf_size, double eps)
+{
+    const Eigen::Index N = x.rows();
+    const Eigen::Index d = x.cols();
+    RowMajorMatrix     u = RowMajorMatrix::Zero(N, d);
+    if (N <= 1) {
+        return u;
+    }
+
+    detail::KdTree tree(x, leaf_size);
+
+    for (Eigen::Index j = 0; j < N; ++j) {
+        const Eigen::VectorXd query = x.row(j).transpose();
+        Eigen::VectorXd       acc   = Eigen::VectorXd::Zero(d);
+        tree.traverse(
+            query, opening_theta,
+            // exact_fn: open one point.
+            [&](Eigen::Index idx) {
+                if (idx == j) {
+                    return;  // skip self
+                }
+                const Eigen::VectorXd diff = query - x.row(idx).transpose();
+                const double          dist = diff.norm();
+                if (dist < eps) {
+                    return;
+                }
+                acc += diff / dist;
+            },
+            // approx_fn: summarize subtree by centroid + count.
+            [&](const Eigen::VectorXd& centroid, std::size_t count) {
+                const Eigen::VectorXd diff = query - centroid;
+                const double          dist = diff.norm();
+                if (dist < eps) {
+                    return;
+                }
+                acc += static_cast<double>(count) * diff / dist;
+            });
+        u.row(j) = (acc / static_cast<double>(N)).transpose();
+    }
+    return u;
+}
+
 }  // namespace
 
 RowMajorMatrix spatial_rank(const Sample& x, const SamplingConfig& sampling, double eps)
 {
     const auto N = static_cast<std::size_t>(x.rows());
-    if (sampling.reference_size == 0 || sampling.reference_size >= N) {
-        return spatial_rank(x, eps);
+    switch (sampling.strategy) {
+        case SamplingConfig::Strategy::Uniform:
+            if (sampling.reference_size == 0 || sampling.reference_size >= N) {
+                return spatial_rank(x, eps);
+            }
+            return spatial_rank_approx_uniform(
+                x, sampling.reference_size, sampling.seed, eps);
+        case SamplingConfig::Strategy::KdTreeLocalExact:
+            return spatial_rank_kdtree(
+                x, sampling.kd_opening_theta, sampling.kd_leaf_size, eps);
+        case SamplingConfig::Strategy::Stratified:
+        default:
+            throw std::invalid_argument(
+                "spatial_rank: SamplingConfig::Strategy::Stratified is reserved "
+                "for a future tranche; use Uniform or KdTreeLocalExact");
     }
-    if (sampling.strategy != SamplingConfig::Strategy::Uniform) {
-        throw std::invalid_argument(
-            "spatial_rank: only SamplingConfig::Strategy::Uniform is implemented; "
-            "Stratified is reserved for a future tranche");
-    }
-    return spatial_rank_approx_uniform(x, sampling.reference_size, sampling.seed, eps);
 }
 
 InverseRankResult inverse_spatial_rank(
@@ -250,17 +306,28 @@ InverseRankResult inverse_spatial_rank(
     if (sampling.reference_size == 0 || sampling.reference_size >= M) {
         return inverse_spatial_rank(u, y, solver);
     }
-    if (sampling.strategy != SamplingConfig::Strategy::Uniform) {
-        throw std::invalid_argument(
-            "inverse_spatial_rank: only SamplingConfig::Strategy::Uniform is "
-            "implemented; Stratified is reserved for a future tranche");
+    switch (sampling.strategy) {
+        case SamplingConfig::Strategy::Uniform:
+        case SamplingConfig::Strategy::KdTreeLocalExact: {
+            // KdTreeLocalExact's tree-aware Weiszfeld variant would require
+            // refactoring the solver API to take a cloud accessor instead
+            // of a raw y matrix — scoped out of tranche (o). For now the
+            // strategy falls through to the uniform-subsample path so
+            // similarity_score with KdTreeLocalExact still works
+            // (spatial_rank uses the tree; inverse_spatial_rank uses
+            // uniform R-subset of y).
+            auto indices
+                = detail::uniform_reference_indices(M, sampling.reference_size, sampling.seed);
+            Sample y_refs = detail::gather_rows(y, indices);
+            return inverse_spatial_rank(u, y_refs, solver);
+        }
+        case SamplingConfig::Strategy::Stratified:
+        default:
+            throw std::invalid_argument(
+                "inverse_spatial_rank: SamplingConfig::Strategy::Stratified "
+                "is reserved for a future tranche; use Uniform or "
+                "KdTreeLocalExact");
     }
-    // Materialize the reference subset once; the Weiszfeld inner loop then
-    // sees a smaller "cloud" and converges much faster at the cost of an
-    // O(1/R)-variance approximation.
-    auto       indices = detail::uniform_reference_indices(M, sampling.reference_size, sampling.seed);
-    Sample     y_refs  = detail::gather_rows(y, indices);
-    return inverse_spatial_rank(u, y_refs, solver);
 }
 
 InverseRankResult inverse_spatial_rank(
