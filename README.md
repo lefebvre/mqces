@@ -1,5 +1,7 @@
 # mqces
 
+[![docs](https://github.com/lefebvre/mqces/actions/workflows/docs.yml/badge.svg)](https://lefebvre.github.io/mqces/)
+
 **M**ultivariate **Q**uantile **C**omparison for **E**nvironmental **S**amples — a
 C++20 reimplementation and extension of the classification method described in:
 
@@ -70,6 +72,7 @@ CMake options (all prefixed `MQCES_ENABLE_*`):
 | `MQCES_ENABLE_COVERAGE`     | OFF | Instrument for gcovr / llvm-cov. |
 | `MQCES_ENABLE_CLANG_TIDY`   | OFF | Run clang-tidy at compile time. |
 | `MQCES_ENABLE_INSTALL`      | OFF | Emit install rules. Requires a system-installed Eigen3 (FetchContent'd Eigen cannot be re-exported through `mqcesTargets`). |
+| `MQCES_ENABLE_DOCS`         | OFF | Build the Sphinx + Breathe + Doxygen documentation site (`docs/`). |
 
 The VS Code workspace at `.vscode/settings.json` wires the same flags
 through CMake Tools.
@@ -142,6 +145,21 @@ newer releases and bump in one shot:
 ```bash
 python3 scripts/refresh_deps.py            # dry-run
 python3 scripts/refresh_deps.py --apply    # rewrite the .cmake file
+```
+
+## Documentation
+
+Full documentation — algorithm walkthroughs, API reference (C++ and
+Python), CLI schema, and developer guides — is published at
+**https://lefebvre.github.io/mqces/**.
+
+To build the site locally:
+
+```bash
+pip install -r docs/requirements.txt
+cmake -B build -DMQCES_ENABLE_DOCS=ON
+cmake --build build --target docs
+xdg-open build/docs/html/index.html
 ```
 
 ## License

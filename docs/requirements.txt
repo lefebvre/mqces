@@ -1,0 +1,7 @@
+# Pinned at known-good versions; bump deliberately.
+sphinx==7.4.7
+furo==2024.8.6
+breathe==4.35.0
+myst-parser==3.0.1
+sphinx-copybutton==0.5.2
+sphinx-design==0.6.1

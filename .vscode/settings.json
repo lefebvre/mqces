@@ -20,7 +20,8 @@
         "MQCES_ENABLE_KOKKOS_CUDA": "OFF",
         "MQCES_ENABLE_SANITIZER": "none",
         "MQCES_ENABLE_COVERAGE": "OFF",
-        "MQCES_ENABLE_CLANG_TIDY": "OFF"
+        "MQCES_ENABLE_CLANG_TIDY": "OFF",
+        "MQCES_ENABLE_DOCS": "ON"
     },
     // ---- C/C++ language services -----------------------------------------
     // We use clangd (llvm-vs-code-extensions.vscode-clangd) and disable the

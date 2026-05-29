@@ -1,0 +1,48 @@
+# Doxygen configuration for mqces.
+#
+# This template uses ${VAR} placeholders so it can be filled in by either
+# CMake's `configure_file()` (without @ONLY) or `envsubst` in CI. The only
+# output we want is XML — Breathe consumes it; the human-facing HTML is
+# produced by Sphinx.
+
+PROJECT_NAME           = "mqces"
+PROJECT_NUMBER         = ${MQCES_VERSION}
+PROJECT_BRIEF          = "Multivariate Quantile Comparison for Environmental Samples"
+OUTPUT_DIRECTORY       = ${MQCES_DOXYGEN_OUTPUT_DIR}
+
+INPUT                  = ${MQCES_DOXYGEN_INPUT_DIR}
+FILE_PATTERNS          = *.hpp *.h
+RECURSIVE              = YES
+EXCLUDE_PATTERNS       = */detail/* */build/* */_build/*
+
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+HIDE_UNDOC_MEMBERS     = YES
+HIDE_UNDOC_CLASSES     = YES
+
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = YES
+MULTILINE_CPP_IS_BRIEF = NO
+MARKDOWN_SUPPORT       = YES
+
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+XML_PROGRAMLISTING     = NO
+
+# Quiet the build; CI surfaces these via the Sphinx step instead.
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO
+WARN_NO_PARAMDOC       = NO
+
+# Preprocessing — pick up Eigen typedefs without parsing all of Eigen.
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+PREDEFINED             = MQCES_DOXYGEN=1
+
+# Keep XML stable across reruns for cache-friendliness.
+SORT_MEMBER_DOCS       = NO
+SORT_BRIEF_DOCS        = NO

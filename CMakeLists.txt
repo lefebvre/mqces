@@ -30,6 +30,7 @@ option(MQCES_ENABLE_KOKKOS_CUDA "Enable Kokkos CUDA execution space"      OFF)
 option(MQCES_ENABLE_COVERAGE    "Instrument for gcovr / llvm-cov"         OFF)
 option(MQCES_ENABLE_CLANG_TIDY  "Run clang-tidy at compile time"          OFF)
 option(MQCES_ENABLE_INSTALL     "Emit install + export rules (mqcesConfig.cmake); requires system-installed Eigen3" OFF)
+option(MQCES_ENABLE_DOCS        "Build Sphinx+Breathe+Doxygen documentation"             OFF)
 
 set(MQCES_ENABLE_SANITIZER "none" CACHE STRING "Sanitizer to enable: none|asan|ubsan|tsan")
 set_property(CACHE MQCES_ENABLE_SANITIZER PROPERTY STRINGS none asan ubsan tsan)
@@ -62,6 +63,10 @@ if(MQCES_ENABLE_PYTHON AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/python/CMakeLists
     add_subdirectory(python)
 endif()
 
+if(MQCES_ENABLE_DOCS AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/docs/CMakeLists.txt")
+    add_subdirectory(docs)
+endif()
+
 # ---- Summary ---------------------------------------------------------------
 message(STATUS "")
 message(STATUS "mqces ${PROJECT_VERSION} configuration:")
@@ -78,4 +83,5 @@ message(STATUS "  Sanitizer ............. ${MQCES_ENABLE_SANITIZER}")
 message(STATUS "  Coverage .............. ${MQCES_ENABLE_COVERAGE}")
 message(STATUS "  clang-tidy ............ ${MQCES_ENABLE_CLANG_TIDY}")
 message(STATUS "  Install rules ......... ${MQCES_ENABLE_INSTALL}")
+message(STATUS "  Documentation ......... ${MQCES_ENABLE_DOCS}")
 message(STATUS "")

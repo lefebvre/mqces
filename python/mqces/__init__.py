@@ -19,12 +19,30 @@ __version__ = _core.__version__
 
 @dataclass(frozen=True)
 class Score:
+    """Per-class similarity score (Eq. 3 of Weber & Dayman).
+
+    ``class_name`` is the class identifier; ``s_xy`` is the Eq. 3 score
+    (non-negative; lower means a better match).
+    """
+
     class_name: str
     s_xy: float
 
 
 @dataclass(frozen=True)
 class ClassificationResult:
+    """Aggregate result of a single :func:`classify` call.
+
+    - ``best_class`` — identifier of the winning class.
+    - ``scores`` — per-class scores sorted ascending by ``s_xy``;
+      ``scores[0].class_name == best_class`` always holds.
+    - ``misclassification_prob`` — probability that the runner-up was
+      actually a better match (Eq. 7 for ``"classic"``;
+      paired-difference t for ``"v2"`` / ``"v3"`` / ``"v4"``).
+    - ``none_of_the_above`` — ``True`` if the test sample does not look
+      like a typical draw from ``best_class`` (page 8 of the paper).
+    """
+
     best_class: str
     scores: tuple[Score, ...]
     misclassification_prob: float
@@ -83,11 +101,24 @@ def classify(
         Each ``specimens`` array must have the same ``n_features`` as ``test``.
     weights
         ``(n_features,)`` diagonal of the W matrix in Eq. 3.
+    epsilon
+        Multiplicative-Gaussian measurement error fraction (Eq. 10).
+        ``0.0`` disables perturbation; ``mc_samples`` is then unused.
+    mc_samples
+        Number of Monte-Carlo replicates per classification call. Higher
+        gives lower-variance scores at proportionally higher wall time.
+    seed
+        Deterministic seed for the Eq. 10 perturbation RNG.
+    nota_threshold
+        p-value threshold for the none-of-the-above decision.
+    n_threads
+        ``0`` = auto (OpenMP default). When ``> 0``, mutates the
+        process-global OpenMP thread cap — see the C++ docs.
     reference_size
-        When > 0, switches spatial_rank and inverse_spatial_rank to the
-        O(N·R) subsample-based approximation with ``R = reference_size``
-        uniform references per cloud. ``0`` (default) uses the exact
-        O(N²) kernel.
+        When > 0, switches ``spatial_rank`` and ``inverse_spatial_rank``
+        to the O(N·R) subsample-based approximation with
+        ``R = reference_size`` uniform references per cloud. ``0``
+        (default) uses the exact O(N²) kernel.
     sampling_seed
         Deterministic seed used to pick the reference subset.
     variant
@@ -96,6 +127,35 @@ def classify(
         - ``"v3"``      — paired t + Vardi-Zhang solver.
         - ``"v4"``      — paired t + VZ + Anderson acceleration
                           (production target at N = 10⁶ scale).
+
+    Returns
+    -------
+    ClassificationResult
+        Best class, sorted per-class scores, misclassification
+        probability against the runner-up, and the NOTA flag.
+
+    Raises
+    ------
+    ValueError
+        If ``test`` is not 2-D, ``weights`` length doesn't match
+        ``test.shape[1]``, or ``variant`` is unknown.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> import mqces
+    >>> rng = np.random.default_rng(0)
+    >>> test    = rng.normal(size=(50, 9))
+    >>> class_a = rng.normal(loc=0.0, size=(80, 9))
+    >>> class_b = rng.normal(loc=1.0, size=(80, 9))
+    >>> result = mqces.classify(
+    ...     test=test,
+    ...     classes=[("a", class_a), ("b", class_b)],
+    ...     weights=np.ones(9),
+    ...     variant="v4",
+    ... )
+    >>> result.best_class
+    'a'
     """
     test_arr    = np.ascontiguousarray(test, dtype=np.float64)
     weights_arr = np.ascontiguousarray(weights, dtype=np.float64)

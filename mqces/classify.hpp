@@ -6,57 +6,91 @@
 
 namespace mqces {
 
-// Classifies a test sample against a set of known classes. Returns the
-// per-class average similarity score (lower is better), the chosen class,
-// and a misclassification probability against the runner-up.
-//
-// Both `classic` and `v2` consume the same inputs and produce the same
-// result shape; they differ only in how the misclassification probability
-// is computed:
-//
-//   classic — Eqs. 5-7 of Weber & Dayman verbatim:
-//             t = (X̄_j − X̄_k) / √((s_j² + s_k²) / N), df = N − 1,
-//             reported as 1 − Pr(T < t).
-//
-//   v2      — paired-difference t with sign preserved:
-//             d_i = S(T, X_{j,i}) − S(T, X_{k,i}),  t = mean(d) / (sd(d)/√N),
-//             df = N − 1, reported as Pr(T < 0) so the value is
-//             unambiguously "probability that the runner-up was actually
-//             better on a random replicate."
-//
-// `options.weights` must have length == classes' feature count.
-
+/**
+ * @brief Paper-faithful classifier (Weber & Dayman, Eqs. 5-7).
+ *
+ * Uses the independent-samples t-statistic of Eq. 6 for the
+ * misclassification probability:
+ * @f[
+ *   t = \frac{\bar{X}_j - \bar{X}_k}{\sqrt{(s_j^2 + s_k^2)/N}},\quad
+ *   df = N - 1,
+ * @f]
+ * reported as @f$1 - \Pr(T < t)@f$. The inner solver is plain Weiszfeld
+ * with the loose tolerance the paper uses.
+ *
+ * @param test     Test sample (n_specimens × n_features).
+ * @param known    Known classes; each must share `n_features` with `test`.
+ * @param options  Classifier options; `options.weights` length must equal
+ *                 the per-class feature count.
+ * @return         Best class, sorted per-class scores, and
+ *                 misclassification probability vs the runner-up.
+ */
 namespace classic {
 ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
 }  // namespace classic
 
+/**
+ * @brief Corrected-statistics classifier (paired-difference t).
+ *
+ * Same inputs and result shape as `classic`. Differences:
+ *
+ * - **t-statistic**: paired-difference form with sign preserved:
+ *   @f$d_i = S(T, X_{j,i}) - S(T, X_{k,i})@f$,
+ *   @f$t = \mathrm{mean}(d) / (\mathrm{sd}(d) / \sqrt{N})@f$,
+ *   reported as @f$\Pr(T < 0)@f$ — "probability the runner-up was
+ *   actually better on a random replicate".
+ * - **Inner solver**: still plain Weiszfeld (loose).
+ *
+ * @param test     Test sample.
+ * @param known    Known classes.
+ * @param options  Classifier options.
+ * @return         Classification result.
+ */
 namespace v2 {
 ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
 }  // namespace v2
 
-// v3 — paired-difference t-statistic (as in v2) but the inner inverse-rank
-// solver is Vardi-Zhang (Vardi & Zhang 2000) instead of plain Weiszfeld.
-// VZ closes the residual-plateau pathology that forces v1/v2 to use a
-// loose Weiszfeld tolerance, so v3 scores are reproducible to ~1e-9
-// regardless of whether iterates hover near a vertex y_i.
-//
-// Caller-provided options.solver is honored, defaulting to a tight VZ
-// config inside the classifier when unset (mc_samples / nota / sampling
-// behavior matches v2).
+/**
+ * @brief Paired-difference t with Vardi-Zhang inner solver.
+ *
+ * Identical statistics to `v2`. The inner solver is Vardi-Zhang
+ * (Vardi & Zhang 2000), which closes Weiszfeld's residual-plateau
+ * pathology with a subgradient correction at the vertices @f$y_i@f$.
+ * Result: scores reproducible to `~1e-9` regardless of whether iterates
+ * hover near a vertex.
+ *
+ * Caller-provided `options.solver` is honored, defaulting to a tight VZ
+ * config when unset. MC, NOTA, and sampling behavior match v2.
+ *
+ * @param test     Test sample.
+ * @param known    Known classes.
+ * @param options  Classifier options.
+ * @return         Classification result.
+ */
 namespace v3 {
 ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
 }  // namespace v3
 
-// v4 — same statistics as v3 (paired-difference t) and same Vardi-Zhang
-// subgradient correction, plus Type-II Anderson acceleration over a
-// rolling window of past iterates. AA converts VZ's linear convergence
-// into superlinear when the problem is amenable, and the safeguarded
-// fallback (Toth-Kelley 2015) prevents pathological divergence by
-// reverting to plain VZ whenever an accelerated step inflates the
-// residual. This is the production-target variant at N = 10⁶ scale.
+/**
+ * @brief Paired-difference t with Vardi-Zhang + Anderson acceleration.
+ *
+ * Same statistics and subgradient correction as `v3`, plus Type-II
+ * Anderson acceleration (AA) over a rolling window of past iterates.
+ * AA converts VZ's linear convergence to superlinear when the problem
+ * is amenable; the safeguarded fallback (Toth-Kelley 2015) reverts to
+ * plain VZ whenever an accelerated step inflates the residual, so
+ * divergence is impossible.
+ *
+ * This is the production-target variant at @f$N = 10^6@f$ scale.
+ *
+ * @param test     Test sample.
+ * @param known    Known classes.
+ * @param options  Classifier options.
+ * @return         Classification result.
+ */
 namespace v4 {
 ClassificationResult classify(
     const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
