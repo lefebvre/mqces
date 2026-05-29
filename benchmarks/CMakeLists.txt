@@ -7,6 +7,8 @@ set(MQCES_BENCHMARKS
     bench_score.cpp
     bench_classify_end_to_end.cpp
     bench_parallel_scaling.cpp
+    bench_solver_comparison.cpp
+    bench_scaling_million_row.cpp
 )
 
 foreach(_src IN LISTS MQCES_BENCHMARKS)

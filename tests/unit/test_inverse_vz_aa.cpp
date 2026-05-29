@@ -174,6 +174,49 @@ TEST(InverseVZAA, IsDeterministic)
     EXPECT_EQ(r1.aa_fallbacks, r2.aa_fallbacks);
 }
 
+// Iteration-count property at d=25 — the production target dimensionality.
+// At d=25 with a moderate cloud (M=200), VZ+AA should typically reach the
+// same tight tol in roughly half the iterations VZ uses on its own. We
+// assert a loose 0.8× bound here so the property survives across
+// reasonable seed variation; the documented production-target ratio of
+// 0.3× holds on larger inputs.
+TEST(InverseVZAA, IterCountAtProductionDimReducesVsVz)
+{
+    std::mt19937_64            gen(0xB16D17);
+    std::normal_distribution<> n01(0.0, 1.0);
+    constexpr int              M = 200, d = 25, N = 16;
+    Sample                     y = gaussian(M, d, 51);
+
+    RowMajor u(N, d);
+    for (int k = 0; k < N; ++k) {
+        Eigen::VectorXd q(d);
+        for (int j = 0; j < d; ++j) {
+            q(j) = n01(gen);
+        }
+        u.row(k) = rank_against(q, y).transpose();
+    }
+
+    SolverConfig sf_vz;
+    sf_vz.kind      = SolverKind::VardiZhang;
+    sf_vz.tol       = 1e-9;
+    sf_vz.max_iters = 1000;
+
+    SolverConfig sf_aa = sf_vz;
+    sf_aa.kind         = SolverKind::VardiZhangAA;
+    sf_aa.aa_window    = 5;
+    sf_aa.aa_reg       = 1e-12;
+
+    auto r_vz = inverse_spatial_rank(u, y, sf_vz);
+    auto r_aa = inverse_spatial_rank(u, y, sf_aa);
+
+    const auto vz_iters = static_cast<double>(r_vz.max_iters_used);
+    const auto aa_iters = static_cast<double>(r_aa.max_iters_used);
+    EXPECT_LT(aa_iters, 0.8 * vz_iters)
+        << "AA used " << aa_iters << " iters; VZ used " << vz_iters
+        << " (ratio " << (aa_iters / vz_iters) << ", aa_fallbacks="
+        << r_aa.aa_fallbacks << ")";
+}
+
 // Safeguard turned off: AA still produces a finite, non-NaN result on
 // benign inputs (the safeguard is for pathological cases, not required
 // for correctness on typical data).

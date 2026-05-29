@@ -92,3 +92,61 @@ static void BM_ClassifyClassic_EpsilonSweep(benchmark::State& state)
     state.counters["epsilon_pct"] = static_cast<double>(state.range(0));
 }
 BENCHMARK(BM_ClassifyClassic_EpsilonSweep)->Arg(1)->Arg(5)->Arg(10)->Arg(20)->Arg(40);
+
+// v2: paired-difference t but same loose Weiszfeld inner solver.
+static void BM_ClassifyV2_End2End(benchmark::State& state)
+{
+    const int         n_classes   = static_cast<int>(state.range(0));
+    const int         n_specimens = 50;
+    const int         d           = 9;
+    const double      epsilon     = 0.0;
+    const std::size_t mc          = 10;
+    auto              s = build_setup(n_classes, n_specimens, d, epsilon, mc);
+    for (auto _ : state) {
+        auto r = mqces::v2::classify(
+            s.test, std::span<const mqces::Class>{s.known}, s.opts);
+        benchmark::DoNotOptimize(r);
+    }
+    state.counters["K"] = n_classes;
+}
+BENCHMARK(BM_ClassifyV2_End2End)->Arg(5)->Arg(10)->Arg(19);
+
+// v3: Vardi-Zhang inner solver. Per-call cost should be similar to v2
+// when no Weiszfeld plateaus are hit; otherwise v3 stays below v2's
+// worst-case (no throw + tight convergence).
+static void BM_ClassifyV3_End2End(benchmark::State& state)
+{
+    const int         n_classes   = static_cast<int>(state.range(0));
+    const int         n_specimens = 50;
+    const int         d           = 9;
+    const double      epsilon     = 0.0;
+    const std::size_t mc          = 10;
+    auto              s = build_setup(n_classes, n_specimens, d, epsilon, mc);
+    for (auto _ : state) {
+        auto r = mqces::v3::classify(
+            s.test, std::span<const mqces::Class>{s.known}, s.opts);
+        benchmark::DoNotOptimize(r);
+    }
+    state.counters["K"] = n_classes;
+}
+BENCHMARK(BM_ClassifyV3_End2End)->Arg(5)->Arg(10)->Arg(19);
+
+// v4: VZ + Anderson acceleration. The per-call wall time is expected to
+// drop notably as N grows (each replicate of similarity_score benefits
+// from AA's reduced iteration count).
+static void BM_ClassifyV4_End2End(benchmark::State& state)
+{
+    const int         n_classes   = static_cast<int>(state.range(0));
+    const int         n_specimens = 50;
+    const int         d           = 9;
+    const double      epsilon     = 0.0;
+    const std::size_t mc          = 10;
+    auto              s = build_setup(n_classes, n_specimens, d, epsilon, mc);
+    for (auto _ : state) {
+        auto r = mqces::v4::classify(
+            s.test, std::span<const mqces::Class>{s.known}, s.opts);
+        benchmark::DoNotOptimize(r);
+    }
+    state.counters["K"] = n_classes;
+}
+BENCHMARK(BM_ClassifyV4_End2End)->Arg(5)->Arg(10)->Arg(19);
