@@ -78,6 +78,21 @@ CMake options (all prefixed `MQCES_ENABLE_*`):
 The VS Code workspace at `.vscode/settings.json` wires the same flags
 through CMake Tools.
 
+### Formatting
+
+When `clang-format` and `git` are found at configure time, two targets
+format the same files the lint workflow checks. Neither runs as part of a
+normal build:
+
+```bash
+cmake --build build --target format        # rewrite sources in place
+cmake --build build --target format-check  # fail on any deviation
+```
+
+CI pins clang-format 19 and configure warns about any other major version.
+Select a specific binary with `-DMQCES_CLANG_FORMAT_EXE=/path/to/clang-format`
+(`pip install "clang-format==19.*"` provides one).
+
 ## Test fixtures
 
 Integration tests consume a synthetic 19-class burnup-style fixture

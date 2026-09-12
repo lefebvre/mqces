@@ -37,6 +37,7 @@ set_property(CACHE MQCES_ENABLE_SANITIZER PROPERTY STRINGS none asan ubsan tsan)
 include(CompilerWarnings)
 include(Sanitizers)
 include(ClangTidy)
+include(ClangFormat)
 include(Dependencies)
 
 # ---- Subdirectories (added as they land in later tranches) -----------------
