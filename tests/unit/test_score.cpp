@@ -1,6 +1,8 @@
 #include <mqces/score.hpp>
 #include <mqces/types.hpp>
 
+#include <mqces/detail/rng.hpp>
+
 #include <gtest/gtest.h>
 
 #include <Eigen/Core>
@@ -17,7 +19,7 @@ namespace {
 Sample gaussian_sample(int n, int d, std::uint64_t seed)
 {
     std::mt19937_64            gen(seed);
-    std::normal_distribution<> n01(0.0, 1.0);
+    const auto n01 = [](std::mt19937_64& g) { return mqces::detail::standard_normal(g); };
     Sample                     s(n, d);
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < d; ++j) {

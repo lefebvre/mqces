@@ -7,6 +7,7 @@
 
 #include <Eigen/Core>
 
+#include <algorithm>
 #include <random>
 #include <span>
 #include <string>
@@ -30,8 +31,9 @@ mqces::Sample gaussian(int n, int d, double center, std::uint64_t seed)
 
 }  // namespace
 
-// Strong scaling: fixed problem size, vary thread count. The MC replicate
-// loop in the classifier parallelizes over the mc_samples axis.
+// Strong scaling: fixed problem size, vary thread count. The classifier
+// parallelizes over classes, jackknife replicates, perturbation replicates
+// and NOTA permutations.
 static void BM_ClassifyStrongScaling(benchmark::State& state)
 {
     const int         n_threads   = static_cast<int>(state.range(0));

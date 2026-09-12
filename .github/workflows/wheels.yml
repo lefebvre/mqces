@@ -29,10 +29,12 @@ jobs:
                   CIBW_ARCHS_MACOS:   "arm64"
                   CIBW_ARCHS_WINDOWS: "AMD64"
                   CIBW_BUILD_VERBOSITY: "1"
-                  # The OpenMP backend is the default; Kokkos is left off for
-                  # wheel builds. CIBW handles the wheel-side toolchain.
-                  CIBW_ENVIRONMENT: >-
-                      MQCES_WHEEL_BUILD=1
+                  # Install each built wheel into a clean environment and run
+                  # the pytest suite against it; cibuildwheel runs this outside
+                  # the source tree, so a wheel missing the extension module
+                  # fails at `import mqces`.
+                  CIBW_TEST_REQUIRES: "pytest"
+                  CIBW_TEST_COMMAND: "pytest {project}/python/tests"
 
             - uses: actions/upload-artifact@v4
               with:

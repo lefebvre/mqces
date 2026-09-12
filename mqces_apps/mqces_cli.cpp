@@ -13,14 +13,18 @@
 //       ...
 //     ],
 //     "options": {
-//       "epsilon":         0.05,                       // optional, default 0
-//       "mc_samples":      10,                         // optional, default 10
-//       "seed":            42,                         // optional
-//       "nota_threshold":  0.05,                       // optional, default 0.05
-//       "n_threads":       0,                          // optional, default auto
-//       "variant":         "classic" | "v2"            // optional, default classic
+//       "epsilon":           0.05,                     // optional, default 0 (no measurement error)
+//       "mc_samples":        10,                       // optional, default 10; >= 2, used when epsilon > 0
+//       "seed":              42,                       // optional
+//       "nota_threshold":    0.05,                     // optional, default 0.05; in (0, 1)
+//       "nota_permutations": 199,                      // optional, default 199; 0 skips NOTA
+//       "n_threads":         0,                        // optional, default auto
+//       "variant":           "classic" | "v2"          // optional, default classic
 //     }
 //   }
+//
+// Exit status: 0 on success, 1 on unreadable/invalid input or a failed
+// classification or write, 2 on bad command-line usage.
 //
 // Output schema:
 //   {
@@ -127,12 +131,14 @@ ParsedInput parse_input(const json& j)
     in.options.uncertainty.seed
         = opt.value("seed", in.options.uncertainty.seed);
     in.options.nota_threshold = opt.value("nota_threshold", in.options.nota_threshold);
+    in.options.nota_permutations
+        = opt.value("nota_permutations", in.options.nota_permutations);
     in.options.n_threads      = opt.value("n_threads", in.options.n_threads);
     in.variant                = opt.value("variant", std::string{"classic"});
 
     if (in.variant != "classic" && in.variant != "v2") {
         throw std::runtime_error(
-            "options.variant: must be \"classic\" or \"v2\" (got \"" + in.variant + "\")");
+            R"(options.variant: must be "classic" or "v2" (got ")" + in.variant + "\")");
     }
     return in;
 }
@@ -151,9 +157,7 @@ json result_to_json(const mqces::ClassificationResult& r, const std::string& var
     return out;
 }
 
-}  // namespace
-
-int main(int argc, char** argv)
+int run(int argc, char** argv)
 {
     std::string input_path;
     std::string output_path;
@@ -233,7 +237,11 @@ int main(int argc, char** argv)
     const auto serialized = pretty ? out_json.dump(2) : out_json.dump();
 
     if (output_path.empty()) {
-        std::cout << serialized << "\n";
+        std::cout << serialized << "\n" << std::flush;
+        if (!std::cout) {
+            std::cerr << "error: failed to write result to stdout\n";
+            return 1;
+        }
     } else {
         std::ofstream f(output_path);
         if (!f) {
@@ -241,6 +249,27 @@ int main(int argc, char** argv)
             return 1;
         }
         f << serialized << "\n";
+        f.close();
+        if (!f) {
+            std::cerr << "error: failed to write result to " << output_path << "\n";
+            return 1;
+        }
     }
     return 0;
+}
+
+}  // namespace
+
+int main(int argc, char** argv)
+{
+    // run() reports expected failures itself; this catches the rest (e.g.
+    // std::bad_alloc) so no exception escapes main.
+    try {
+        return run(argc, argv);
+    } catch (const std::exception& e) {
+        std::cerr << "error: " << e.what() << "\n";
+    } catch (...) {
+        std::cerr << "error: unknown exception\n";
+    }
+    return 1;
 }

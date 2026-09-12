@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <cstddef>
+#include <exception>
 #include <utility>
 
 #ifdef MQCES_HAVE_OPENMP
@@ -8,58 +10,61 @@
 #endif
 
 // Tiny parallel shim. OpenMP backend when MQCES_HAVE_OPENMP is defined,
-// sequential fallback otherwise. Kokkos backend will live in a separate
-// translation unit (parallel_kokkos.cpp) when MQCES_ENABLE_KOKKOS=ON.
+// sequential fallback otherwise.
 
 namespace mqces::detail {
 
+// Call f(i) for every i in [0, n).
+//
+// `n_threads` > 0 caps the team size for this region only, via the
+// num_threads clause; it never touches the process-wide OpenMP ICVs, so
+// other OpenMP users in the process are unaffected. 0 uses the runtime
+// default.
+//
+// An exception may not propagate out of an OpenMP structured block (doing so
+// terminates the process), so each iteration runs under try/catch. The first
+// exception is kept, remaining iterations are skipped, and it is rethrown on
+// the calling thread once the region has joined.
 template <class F>
-inline void parallel_for(std::size_t n, F&& f)
+void parallel_for(std::size_t n, int n_threads, F&& f)
 {
 #ifdef MQCES_HAVE_OPENMP
-    const auto n_signed = static_cast<std::ptrdiff_t>(n);
-#pragma omp parallel for schedule(static)
+    const auto         n_signed = static_cast<std::ptrdiff_t>(n);
+    const int          team     = n_threads > 0 ? n_threads : omp_get_max_threads();
+    std::exception_ptr first_error;
+    std::atomic<bool>  failed{false};
+#pragma omp parallel for schedule(static) num_threads(team)
     for (std::ptrdiff_t i = 0; i < n_signed; ++i) {
-        f(static_cast<std::size_t>(i));
+        if (failed.load(std::memory_order_relaxed)) {
+            continue;
+        }
+        try {
+            f(static_cast<std::size_t>(i));
+        } catch (...) {
+#pragma omp critical(mqces_parallel_for_error)
+            {
+                if (!first_error) {
+                    first_error = std::current_exception();
+                }
+            }
+            failed.store(true, std::memory_order_relaxed);
+        }
+    }
+    if (first_error) {
+        std::rethrow_exception(first_error);
     }
 #else
+    (void)n_threads;
     for (std::size_t i = 0; i < n; ++i) {
         f(i);
     }
 #endif
 }
 
-// parallel_reduce(n, init, map, combine): apply `map(i)` for i in [0, n),
-// combine results with `combine(acc, value)` starting from `init`. The
-// combine operation must be associative and commutative.
-template <class T, class Map, class Combine>
-inline T parallel_reduce(std::size_t n, T init, Map&& map, Combine&& combine)
+template <class F>
+void parallel_for(std::size_t n, F&& f)
 {
-    if (n == 0) {
-        return init;
-    }
-#ifdef MQCES_HAVE_OPENMP
-    T result = init;
-#pragma omp parallel
-    {
-        T local = init;
-#pragma omp for nowait schedule(static)
-        for (std::ptrdiff_t i = 0; i < static_cast<std::ptrdiff_t>(n); ++i) {
-            local = combine(local, map(static_cast<std::size_t>(i)));
-        }
-#pragma omp critical
-        {
-            result = combine(result, local);
-        }
-    }
-    return result;
-#else
-    T result = init;
-    for (std::size_t i = 0; i < n; ++i) {
-        result = combine(result, map(i));
-    }
-    return result;
-#endif
+    parallel_for(n, 0, std::forward<F>(f));
 }
 
 inline int max_threads()
@@ -77,17 +82,6 @@ inline int current_thread_id()
     return omp_get_thread_num();
 #else
     return 0;
-#endif
-}
-
-inline void set_max_threads(int n)
-{
-#ifdef MQCES_HAVE_OPENMP
-    if (n > 0) {
-        omp_set_num_threads(n);
-    }
-#else
-    (void)n;
 #endif
 }
 

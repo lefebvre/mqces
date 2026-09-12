@@ -1,6 +1,8 @@
 #include <mqces/quantile.hpp>
 #include <mqces/types.hpp>
 
+#include <mqces/detail/rng.hpp>
+
 #include <gtest/gtest.h>
 
 #include <Eigen/Core>
@@ -29,7 +31,7 @@ constexpr double kRoundTripTol = 1e-7;
 TEST(InverseRank, RoundTripOnGaussianCloud)
 {
     std::mt19937_64                gen(42);
-    std::normal_distribution<>     n01(0.0, 1.0);
+    const auto n01 = [](std::mt19937_64& g) { return mqces::detail::standard_normal(g); };
 
     constexpr int M = 30;  // size of cloud y
     constexpr int d = 4;
@@ -98,7 +100,7 @@ TEST(InverseRank, ThrowsOnDimensionMismatch)
 TEST(InverseRank, ThrowsOnNonConvergence)
 {
     std::mt19937_64               gen(7);
-    std::normal_distribution<>    n01(0.0, 1.0);
+    const auto n01 = [](std::mt19937_64& g) { return mqces::detail::standard_normal(g); };
     constexpr int M = 20, d = 3, N = 2;
 
     Sample y(M, d);
@@ -124,7 +126,7 @@ TEST(InverseRank, ThrowsOnNonConvergence)
 TEST(InverseRank, ReportsIterationCount)
 {
     std::mt19937_64            gen(123);
-    std::normal_distribution<> n01(0.0, 1.0);
+    const auto n01 = [](std::mt19937_64& g) { return mqces::detail::standard_normal(g); };
     constexpr int              M = 20, d = 3, N = 4;
 
     Sample y(M, d);

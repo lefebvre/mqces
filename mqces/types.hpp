@@ -25,7 +25,7 @@ struct Class {
 
 struct Score {
     std::string class_name;
-    double      s_xy;  // Eq. 3
+    double      s_xy;  // Eq. 3, evaluated on the observed (unperturbed) samples
 };
 
 struct ClassificationResult {
@@ -35,17 +35,24 @@ struct ClassificationResult {
     bool               none_of_the_above = false;
 };
 
+// Controls the measurement-error term of the misclassification probability.
+// Specimen sampling variability is always estimated (by leave-one-out
+// jackknife) and needs no configuration.
 struct UncertaintyConfig {
-    double        epsilon = 0.0;       // measurement error fraction (Eq. 10)
-    std::size_t   mc_samples = 10;     // replicate count per classification call
-    std::uint64_t seed = 0xC0FFEEULL;  // deterministic; per-thread streams derived
+    double        epsilon = 0.0;       // measurement error fraction (Eq. 10); 0 disables the term
+    std::size_t   mc_samples = 10;     // perturbation replicates, >= 2; used only when epsilon > 0
+    std::uint64_t seed = 0xC0FFEEULL;  // deterministic; per-replicate streams derived
 };
 
 struct ClassifierOptions {
     FeatureWeights    weights;  // diag(W); required, no default — see Eq. 4
     UncertaintyConfig uncertainty{};
-    double            nota_threshold = 0.05;
-    int               n_threads = 0;  // 0 == auto (OpenMP runtime default)
+    double            nota_threshold = 0.05;  // p-value in (0, 1)
+    // Random splits drawn by the none-of-the-above permutation test; 0 skips
+    // the test. The smallest attainable p-value is 1 / (nota_permutations + 1),
+    // so this must be at least 1 / nota_threshold - 1.
+    std::size_t nota_permutations = 199;
+    int         n_threads = 0;  // 0 == auto (OpenMP runtime default)
 };
 
 }  // namespace mqces

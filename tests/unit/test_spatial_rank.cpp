@@ -6,6 +6,7 @@
 #include <Eigen/Core>
 
 #include <cmath>
+#include <numbers>
 
 using mqces::Sample;
 using mqces::spatial_rank;
@@ -59,7 +60,7 @@ TEST(SpatialRank, SymmetricCloudHasZeroCentroidRank)
     Sample        x(N, 2);
     x.row(0).setZero();
     for (int k = 0; k < 6; ++k) {
-        double theta = 2.0 * M_PI * static_cast<double>(k) / 6.0;
+        double theta = 2.0 * std::numbers::pi * static_cast<double>(k) / 6.0;
         x(k + 1, 0)  = std::cos(theta);
         x(k + 1, 1)  = std::sin(theta);
     }

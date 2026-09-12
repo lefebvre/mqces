@@ -6,7 +6,6 @@
 
 #include <Eigen/Core>
 
-#include <algorithm>
 #include <cmath>
 #include <span>
 
@@ -17,63 +16,40 @@ ClassificationResult classify(
 {
     detail::validate_classify_inputs(test, known, options);
 
-    const auto K = static_cast<Eigen::Index>(known.size());
-    const auto N = static_cast<Eigen::Index>(options.uncertainty.mc_samples);
+    auto        ranking = detail::rank_classes(test, known, options);
+    auto&       result  = ranking.result;
+    const auto  best    = ranking.best;
+    const auto  runner  = ranking.runner_up;
 
-    const Eigen::MatrixXd scores = detail::collect_replicate_scores(test, known, options);
+    // Eqs. 5-7: t-statistic against the runner-up, treating the two scores as
+    // independent. With K == 1 there is no alternative to misclassify into
+    // and the probability stays 0.
+    if (known.size() >= 2) {
+        const auto rep_best   = detail::collect_replicates(test, known[best], best, options);
+        const auto rep_runner = detail::collect_replicates(test, known[runner], runner, options);
 
-    // Per-class mean and variance.
-    Eigen::VectorXd means(K);
-    Eigen::VectorXd vars(K);
-    for (Eigen::Index k = 0; k < K; ++k) {
-        means(k) = detail::row_mean(scores, k);
-        vars(k)  = detail::row_variance(scores, k);
-    }
+        const auto score_variance = [](const detail::Replicates& rep) {
+            return detail::jackknife_variance(rep.drop_test)
+                 + detail::jackknife_variance(rep.drop_class)
+                 + detail::sample_variance(rep.perturbed);
+        };
 
-    // Best class = argmin(mean).
-    Eigen::Index best_idx = 0;
-    means.minCoeff(&best_idx);
-
-    // Build sorted score list.
-    std::vector<std::pair<double, Eigen::Index>> ranking;
-    ranking.reserve(static_cast<std::size_t>(K));
-    for (Eigen::Index k = 0; k < K; ++k) {
-        ranking.emplace_back(means(k), k);
-    }
-    std::sort(ranking.begin(), ranking.end());
-
-    ClassificationResult result;
-    result.scores.reserve(static_cast<std::size_t>(K));
-    for (const auto& [m, k] : ranking) {
-        result.scores.push_back({known[static_cast<std::size_t>(k)].name, m});
-    }
-    result.best_class = known[static_cast<std::size_t>(best_idx)].name;
-
-    // Eqs. 5-7: t-statistic against the runner-up. With sorted scores the
-    // runner-up is ranking[1] (always present because validate enforces
-    // known.size() >= 1; for K == 1 we set probability to 0 — no alternative
-    // to misclassify into).
-    if (K >= 2) {
-        const Eigen::Index runner_up = ranking[1].second;
-        const double       diff      = means(runner_up) - means(best_idx);
-        const double       denom     = std::sqrt(
-            (vars(runner_up) + vars(best_idx)) / static_cast<double>(N));
+        const double diff = ranking.observed(static_cast<Eigen::Index>(runner))
+                          - ranking.observed(static_cast<Eigen::Index>(best));
+        const double denom = std::sqrt(score_variance(rep_runner) + score_variance(rep_best));
         if (denom > 0.0 && std::isfinite(denom)) {
-            const double t = diff / denom;
-            const double df = static_cast<double>(N - 1);
+            const double t  = diff / denom;
+            const double df = detail::comparison_df(test, known[best], known[runner]);
             // Paper's Eq. 7: 1 - Pr(T < t). Equivalently Pr(T >= t).
             result.misclassification_prob = 1.0 - detail::students_t_cdf(t, df);
         } else {
-            // Zero spread — the two means agree exactly. Treat as 50/50.
+            // Zero spread — only possible when every specimen is identical.
             result.misclassification_prob = (diff == 0.0) ? 0.5 : 0.0;
         }
     }
 
-    // NOTA check uses the same MC scores plus a within-class reference.
-    Eigen::VectorXd best_row = scores.row(best_idx).transpose();
     result.none_of_the_above = is_none_of_the_above(
-        test, known[static_cast<std::size_t>(best_idx)], best_row, options);
-
+        test, known[best], ranking.observed(static_cast<Eigen::Index>(best)), options);
     return result;
 }
 

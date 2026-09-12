@@ -17,6 +17,7 @@ set(MQCES_UNIT_TESTS
     unit/test_classify_classic.cpp
     unit/test_classify_v2.cpp
     unit/test_nota.cpp
+    unit/test_calibration.cpp
 )
 
 foreach(_src IN LISTS MQCES_UNIT_TESTS)
@@ -65,3 +66,16 @@ foreach(_src IN LISTS MQCES_INTEGRATION_TESTS)
         PROPERTIES LABELS integration
     )
 endforeach()
+
+# ---- CLI --------------------------------------------------------------------
+# Drives the built executable through a CMake script (no extra tooling).
+if(TARGET mqces_cli)
+    add_test(NAME mqces_cli
+        COMMAND "${CMAKE_COMMAND}"
+            "-DMQCES_CLI=$<TARGET_FILE:mqces_cli>"
+            "-DINPUT=${CMAKE_CURRENT_SOURCE_DIR}/data/cli_small_input.json"
+            "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/cli_test"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/cli/run_cli_test.cmake"
+    )
+    set_tests_properties(mqces_cli PROPERTIES LABELS integration)
+endif()

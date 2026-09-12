@@ -52,8 +52,9 @@ Setup build_setup(int n_classes, int n_specimens, int d, double epsilon,
 
 }  // namespace
 
-// Full classifier pipeline: build options, run K × N classifications,
-// produce a result.
+// Full classifier pipeline on K classes: K observed scores, jackknife
+// replicates for the best and runner-up classes, and the NOTA permutation
+// test. Items processed counts whole classifications.
 static void BM_ClassifyClassic_End2End(benchmark::State& state)
 {
     const int    n_classes   = static_cast<int>(state.range(0));
@@ -68,8 +69,7 @@ static void BM_ClassifyClassic_End2End(benchmark::State& state)
             s.test, std::span<const mqces::Class>{s.known}, s.opts);
         benchmark::DoNotOptimize(r);
     }
-    state.SetItemsProcessed(state.iterations()
-                            * static_cast<int64_t>(n_classes) * mc);
+    state.SetItemsProcessed(state.iterations());
     state.counters["K"]  = n_classes;
     state.counters["N"]  = static_cast<double>(mc);
 }

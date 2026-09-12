@@ -23,10 +23,19 @@ Checks: >
     -readability-function-cognitive-complexity,
     -misc-no-recursion,
     -misc-non-private-member-variables-in-classes,
-    -misc-include-cleaner
+    -misc-include-cleaner,
+    -bugprone-easily-swappable-parameters
 
-# Don't enforce checks on third-party or generated headers.
-HeaderFilterRegex: '^.*/mqces/(?!build/|_deps/).*\.(hpp|h)$'
+# bugprone-easily-swappable-parameters is off: numeric code is built from
+# (sample, sample, weights) and (value, tolerance, iteration-cap) signatures,
+# where every call site would need a suppression.
+
+# Report diagnostics only in project headers: mqces/*.hpp, mqces/detail/*.hpp
+# and the generated mqces/version.hpp. Third-party headers live under
+# build/*/_deps/<name>-src/, which never has an "mqces/" directory directly
+# above the header. clang-tidy's regex engine (llvm::Regex, POSIX ERE) has no
+# lookahead, so exclusions must be expressed as a positive match.
+HeaderFilterRegex: '.*/mqces/(detail/)?[A-Za-z0-9_]+\.hpp$'
 
 # Project naming convention: snake_case for variables / functions, CamelCase
 # for types, ALL_CAPS for macros, kCamelCase for constexpr/static constants.
@@ -45,6 +54,8 @@ CheckOptions:
     - { key: readability-identifier-naming.MacroDefinitionPrefix,   value: 'MQCES_' }
     # No-op when these inferred conventions match what we already wrote.
 
-WarningsAsErrors: ''
+# Every enabled check is an error, so run-clang-tidy and the tidy build
+# preset fail on findings instead of printing them.
+WarningsAsErrors: '*'
 FormatStyle: file
 ...

@@ -18,28 +18,32 @@ using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eig
 
 RowMajorMatrix spatial_rank(const Sample& x, double eps)
 {
-    const Eigen::Index N = x.rows();
+    const Eigen::Index n = x.rows();
     const Eigen::Index d = x.cols();
-    RowMajorMatrix     u = RowMajorMatrix::Zero(N, d);
-    if (N <= 1) {
+    RowMajorMatrix     u = RowMajorMatrix::Zero(n, d);
+    if (n <= 1) {
         return u;
     }
-    const double inv_N = 1.0 / static_cast<double>(N);
+    const double inv_n = 1.0 / static_cast<double>(n);
 
-    for (Eigen::Index j = 0; j < N; ++j) {
-        Eigen::VectorXd acc = Eigen::VectorXd::Zero(d);
-        for (Eigen::Index i = 0; i < N; ++i) {
+    // Scratch vectors are allocated once; assigning an expression of the
+    // same size into them does not reallocate inside the O(N^2) loop.
+    Eigen::VectorXd acc(d);
+    Eigen::VectorXd diff(d);
+    for (Eigen::Index j = 0; j < n; ++j) {
+        acc.setZero();
+        for (Eigen::Index i = 0; i < n; ++i) {
             if (i == j) {
                 continue;
             }
-            Eigen::VectorXd diff = x.row(j).transpose() - x.row(i).transpose();
-            double          norm = diff.norm();
+            diff.noalias() = x.row(j).transpose() - x.row(i).transpose();
+            const double norm = diff.norm();
             if (norm < eps) {
                 continue;
             }
-            acc += diff / norm;
+            acc.noalias() += diff / norm;
         }
-        u.row(j) = (inv_N * acc).transpose();
+        u.row(j) = (inv_n * acc).transpose();
     }
     return u;
 }

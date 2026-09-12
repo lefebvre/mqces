@@ -7,7 +7,9 @@
 
 #include <Eigen/Core>
 
+#include <cstdlib>
 #include <span>
+#include <string>
 #include <vector>
 
 namespace tf = mqces::test_fixtures;
@@ -25,6 +27,11 @@ mqces::Sample make_sample(const double* base)
         }
     }
     return s;
+}
+
+mqces::Sample test_sample(int k)
+{
+    return make_sample(tf::test_data + k * tf::N_SPECIMENS * tf::N_FEATURES);
 }
 
 std::vector<mqces::Class> build_known_classes()
@@ -52,70 +59,78 @@ mqces::ClassifierOptions default_options()
     return opts;
 }
 
+int class_index(const std::string& name)
+{
+    for (int j = 0; j < tf::N_CLASSES; ++j) {
+        if (name == tf::class_names[j]) {
+            return j;
+        }
+    }
+    return -1;
+}
+
 }  // namespace
 
-// End-to-end: every test sample drawn from class k should be classified to
-// some class. (Strict "best == k" doesn't hold for every k at this fixture
-// size + noise level — neighboring classes' centers are very close — but
-// "best is within 2 of true k" should hold for the bulk of cases.)
-TEST(BurnupPipeline, EveryTestSampleNearItsTrueClass)
+// End-to-end: every test sample drawn from class k is assigned to class k,
+// and NOTA stays quiet for all but the occasional sample (its false-positive
+// rate is nota_threshold = 5%, so ~1 of 19 is expected).
+TEST(BurnupPipeline, ClassifiesGenuineSamplesToTheirTrueClass)
 {
-    auto known = build_known_classes();
-    auto opts  = default_options();
+    const auto known = build_known_classes();
+    const auto opts  = default_options();
 
-    int correct_or_adjacent = 0;
+    int nota_fired = 0;
     for (int k = 0; k < tf::N_CLASSES; ++k) {
-        const double* base = tf::test_data + k * tf::N_SPECIMENS * tf::N_FEATURES;
-        auto          test = make_sample(base);
-        auto result = mqces::classic::classify(test, std::span<const mqces::Class>{known}, opts);
-        ASSERT_FALSE(result.best_class.empty()) << "no best class for k=" << k;
-        // Look up the chosen class's index.
-        int chosen = -1;
+        const auto result
+            = mqces::classic::classify(test_sample(k), std::span<const mqces::Class>{known}, opts);
+        EXPECT_EQ(class_index(result.best_class), k);
+        EXPECT_LT(result.misclassification_prob, 0.5) << "k=" << k;
+        nota_fired += result.none_of_the_above ? 1 : 0;
+    }
+    EXPECT_LE(nota_fired, 3);
+}
+
+// Withhold each sample's true class. The classifier must fall back to an
+// adjacent time step and NOTA must flag that the sample belongs to none of
+// the remaining classes.
+//
+// For interior k the sample sits between two neighbours that are nearly
+// equally good matches, so an honest misclassification probability is
+// substantial. Before specimen sampling variability entered the standard
+// error, these came out orders of magnitude too small.
+TEST(BurnupPipeline, WithheldTrueClassIsFlagged)
+{
+    const auto known = build_known_classes();
+    auto       opts  = default_options();
+
+    int    nota_fired   = 0;
+    double interior_sum_classic = 0.0;
+    double interior_sum_v2      = 0.0;
+    for (int k = 0; k < tf::N_CLASSES; ++k) {
+        std::vector<mqces::Class> others;
         for (int j = 0; j < tf::N_CLASSES; ++j) {
-            if (result.best_class == tf::class_names[j]) {
-                chosen = j;
-                break;
+            if (j != k) {
+                others.push_back(known[static_cast<std::size_t>(j)]);
             }
         }
-        ASSERT_GE(chosen, 0) << "chosen class not in fixture for k=" << k;
-        if (std::abs(chosen - k) <= 2) {
-            ++correct_or_adjacent;
+        const auto test = test_sample(k);
+        const std::span<const mqces::Class> span{others};
+
+        opts.nota_permutations = mqces::ClassifierOptions{}.nota_permutations;
+        const auto r_classic   = mqces::classic::classify(test, span, opts);
+        opts.nota_permutations = 0;  // NOTA is shared; skip recomputing it
+        const auto r_v2        = mqces::v2::classify(test, span, opts);
+
+        EXPECT_EQ(std::abs(class_index(r_classic.best_class) - k), 1) << "k=" << k;
+        nota_fired += r_classic.none_of_the_above ? 1 : 0;
+        if (k > 0 && k < tf::N_CLASSES - 1) {
+            interior_sum_classic += r_classic.misclassification_prob;
+            interior_sum_v2 += r_v2.misclassification_prob;
         }
     }
-    // Loose property: at least ~60% of test samples should land within 2
-    // time-steps of their true class. Neighboring classes are very similar
-    // by construction (smooth burnup curves), so an exact match is too
-    // strict at N_SPECIMENS=50.
-    EXPECT_GE(correct_or_adjacent, static_cast<int>(0.6 * tf::N_CLASSES));
-}
+    EXPECT_GE(nota_fired, tf::N_CLASSES - 1);
 
-// Misclassification probabilities should all fall inside [0, 1].
-TEST(BurnupPipeline, MisclassProbsAreCalibrated)
-{
-    auto known = build_known_classes();
-    auto opts  = default_options();
-    for (int k = 0; k < tf::N_CLASSES; ++k) {
-        const double* base = tf::test_data + k * tf::N_SPECIMENS * tf::N_FEATURES;
-        auto          test = make_sample(base);
-        auto result = mqces::classic::classify(test, std::span<const mqces::Class>{known}, opts);
-        EXPECT_GE(result.misclassification_prob, 0.0) << "k=" << k;
-        EXPECT_LE(result.misclassification_prob, 1.0) << "k=" << k;
-    }
-}
-
-// v2 must produce the same best_class as classic on this dataset (both
-// pick argmin over the same MC score means).
-TEST(BurnupPipeline, V2AgreesWithClassicOnBestClass)
-{
-    auto known = build_known_classes();
-    auto opts  = default_options();
-    for (int k = 0; k < tf::N_CLASSES; ++k) {
-        const double* base = tf::test_data + k * tf::N_SPECIMENS * tf::N_FEATURES;
-        auto          test = make_sample(base);
-        auto r_classic = mqces::classic::classify(
-            test, std::span<const mqces::Class>{known}, opts);
-        auto r_v2 = mqces::v2::classify(
-            test, std::span<const mqces::Class>{known}, opts);
-        EXPECT_EQ(r_classic.best_class, r_v2.best_class) << "k=" << k;
-    }
+    const double n_interior = tf::N_CLASSES - 2;
+    EXPECT_GT(interior_sum_classic / n_interior, 0.1);
+    EXPECT_GT(interior_sum_v2 / n_interior, 0.1);
 }

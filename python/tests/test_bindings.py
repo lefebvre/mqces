@@ -128,3 +128,47 @@ def test_classify_validates_test_shape():
     classes = [("k", np.ones((10, 3)))]
     with pytest.raises(ValueError):
         mqces.classify(np.ones(10), classes, np.ones(3))  # test is 1-D
+
+
+@pytest.mark.parametrize("variant", ["V2", "classic ", "", "paired"])
+def test_classify_rejects_unknown_variant(variant):
+    d       = 2
+    classes = [("k", _gaussian_class(10, d, 0.0, 1.0, 1))]
+    test    = _gaussian_class(10, d, 0.0, 1.0, 2)
+    with pytest.raises(ValueError, match="variant"):
+        mqces.classify(test, classes, np.ones(d), variant=variant)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [{"epsilon": -0.1}, {"mc_samples": 1}, {"nota_threshold": 0.0},
+     {"nota_threshold": 1.5}, {"nota_permutations": 5}],
+)
+def test_classify_rejects_invalid_options(options):
+    d       = 2
+    classes = [("k", _gaussian_class(10, d, 0.0, 1.0, 1))]
+    test    = _gaussian_class(10, d, 0.0, 1.0, 2)
+    with pytest.raises(ValueError):
+        mqces.classify(test, classes, np.ones(d), **options)
+
+
+@pytest.mark.parametrize("variant", ["classic", "v2"])
+def test_close_classes_report_substantial_uncertainty(variant):
+    # Classes 0.3 standard deviations apart are genuinely hard to tell apart;
+    # the default epsilon = 0 must still yield an informative probability.
+    d       = 3
+    classes = [
+        ("A", _gaussian_class(20, d, 0.0, 1.0, 5)),
+        ("B", _gaussian_class(20, d, 0.3, 1.0, 6)),
+    ]
+    test = _gaussian_class(20, d, 0.0, 1.0, 7)
+    res  = mqces.classify(test, classes, np.ones(d), variant=variant, n_threads=1)
+    assert 0.01 < res.misclassification_prob <= 0.5
+
+
+def test_nota_flags_sample_from_unknown_distribution():
+    d       = 3
+    classes = [("k", _gaussian_class(30, d, 0.0, 1.0, 1))]
+    test    = _gaussian_class(30, d, 3.0, 1.0, 2)
+    res     = mqces.classify(test, classes, np.ones(d), n_threads=1)
+    assert res.none_of_the_above

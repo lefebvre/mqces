@@ -27,18 +27,35 @@ jobs:
                 echo "CC=clang"  >> "$GITHUB_ENV"
                 echo "CXX=clang++" >> "$GITHUB_ENV"
 
+            # libomp's worker threads are not TSan-instrumented, so TSan alone
+            # reports false races on every parallel region. Archer (LLVM's
+            # OMPT tool shipped with libomp) tells TSan about OpenMP's
+            # synchronization; without it the tsan job would be noise.
+            - name: Enable Archer (tsan)
+              if: matrix.sanitizer == 'tsan'
+              run: |
+                archer=$(find /usr/lib/llvm-*/lib -name 'libarcher.so' 2>/dev/null | sort -V | tail -n 1)
+                if [ -z "$archer" ]; then
+                    echo "libarcher.so not found; cannot run TSan over OpenMP code" >&2
+                    exit 1
+                fi
+                echo "OMP_TOOL_LIBRARIES=$archer" >> "$GITHUB_ENV"
+                echo "ARCHER_OPTIONS=verbose=1" >> "$GITHUB_ENV"
+
             - uses: hendrikmuhs/ccache-action@v1.2
               with: { key: san-${{ matrix.sanitizer }} }
 
             - name: Configure (${{ matrix.sanitizer }})
-              run: cmake --preset ${{ matrix.sanitizer }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+              run: cmake --preset ${{ matrix.sanitizer }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DMQCES_WERROR=ON
 
             - name: Build
               run: cmake --build --preset ${{ matrix.sanitizer }} -j
 
+            # Integration tests included: they exercise the parallel classifier
+            # paths on realistic data sizes.
             - name: Test
               env:
                   ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
                   UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-                  TSAN_OPTIONS: halt_on_error=1
-              run: ctest --preset ${{ matrix.sanitizer }} --label-regex unit
+                  TSAN_OPTIONS: halt_on_error=1:ignore_noninstrumented_modules=1
+              run: ctest --preset ${{ matrix.sanitizer }} --label-regex 'unit|integration'

@@ -47,8 +47,15 @@ double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& 
     // squared distances over many specimens). A proper fix is to swap the
     // iteration for Vardi-Zhang or to add stagnation detection; that's a
     // separate piece of work — see TODO in detail/nonlinear_solve.hpp.
+    //
+    // The iteration cap is generous because convergence is linear and slows
+    // sharply when a solution lies in the gap between well-separated
+    // clusters, which is exactly what the none-of-the-above permutation test
+    // produces when it pools a test sample with a distant class: at a
+    // separation of ~5000 cluster widths some rows need ~12000 iterations.
+    // Rows that converge quickly are unaffected.
     constexpr double      kScoreInvRankTol      = 1e-5;
-    constexpr std::size_t kScoreInvRankMaxIters = 1000;
+    constexpr std::size_t kScoreInvRankMaxIters = 50000;
     auto x_tilde
         = inverse_spatial_rank(u_x, y, kScoreInvRankTol, kScoreInvRankMaxIters).x_tilde;
     auto y_tilde

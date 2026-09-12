@@ -101,7 +101,7 @@ mqces::FeatureWeights to_weights(
 mqces::ClassifierOptions build_options(
     const nb::ndarray<double, nb::c_contig>& weights_arr, Eigen::Index expected_d,
     double epsilon, std::size_t mc_samples, std::uint64_t seed,
-    double nota_threshold, int n_threads)
+    double nota_threshold, std::size_t nota_permutations, int n_threads)
 {
     mqces::ClassifierOptions o;
     o.weights                   = to_weights(weights_arr, expected_d);
@@ -109,6 +109,7 @@ mqces::ClassifierOptions build_options(
     o.uncertainty.mc_samples    = mc_samples;
     o.uncertainty.seed          = seed;
     o.nota_threshold            = nota_threshold;
+    o.nota_permutations         = nota_permutations;
     o.n_threads                 = n_threads;
     return o;
 }
@@ -137,11 +138,13 @@ nb::dict classify_wrapper(
     std::size_t                                                                    mc_samples,
     std::uint64_t                                                                  seed,
     double                                                                         nota_threshold,
+    std::size_t                                                                    nota_permutations,
     int                                                                            n_threads)
 {
     mqces::Sample test = to_sample(test_arr, "test");
     auto          opts = build_options(weights_arr, test.cols(), epsilon,
-                                       mc_samples, seed, nota_threshold, n_threads);
+                                       mc_samples, seed, nota_threshold,
+                                       nota_permutations, n_threads);
     auto          cs   = to_classes(classes);
     std::span<const mqces::Class> known(cs);
     return result_to_dict(Classify(test, known, opts));
@@ -154,22 +157,27 @@ NB_MODULE(_mqces_core, m)
     m.doc()                  = "nanobind bindings for mqces";
     m.attr("__version__")    = mqces::version_string;
 
+    // Keyword defaults come from the C++ option structs so the two cannot drift.
+    const mqces::ClassifierOptions defaults;
+
     m.def("classify_classic", &classify_wrapper<mqces::classic::classify>,
           nb::arg("test"), nb::arg("classes"), nb::arg("weights"),
-          nb::arg("epsilon")        = 0.0,
-          nb::arg("mc_samples")     = 10,
-          nb::arg("seed")           = std::uint64_t{0xC0FFEE},
-          nb::arg("nota_threshold") = 0.05,
-          nb::arg("n_threads")      = 0,
+          nb::arg("epsilon")           = defaults.uncertainty.epsilon,
+          nb::arg("mc_samples")        = defaults.uncertainty.mc_samples,
+          nb::arg("seed")              = defaults.uncertainty.seed,
+          nb::arg("nota_threshold")    = defaults.nota_threshold,
+          nb::arg("nota_permutations") = defaults.nota_permutations,
+          nb::arg("n_threads")         = defaults.n_threads,
           "Run mqces::classic::classify and return a dict result.");
 
     m.def("classify_v2", &classify_wrapper<mqces::v2::classify>,
           nb::arg("test"), nb::arg("classes"), nb::arg("weights"),
-          nb::arg("epsilon")        = 0.0,
-          nb::arg("mc_samples")     = 10,
-          nb::arg("seed")           = std::uint64_t{0xC0FFEE},
-          nb::arg("nota_threshold") = 0.05,
-          nb::arg("n_threads")      = 0,
+          nb::arg("epsilon")           = defaults.uncertainty.epsilon,
+          nb::arg("mc_samples")        = defaults.uncertainty.mc_samples,
+          nb::arg("seed")              = defaults.uncertainty.seed,
+          nb::arg("nota_threshold")    = defaults.nota_threshold,
+          nb::arg("nota_permutations") = defaults.nota_permutations,
+          nb::arg("n_threads")         = defaults.n_threads,
           "Run mqces::v2::classify and return a dict result.");
 
     m.def("similarity_score",
