@@ -26,62 +26,58 @@ namespace mqces::detail {
 // exception is kept, remaining iterations are skipped, and it is rethrown on
 // the calling thread once the region has joined.
 template <class F>
-void parallel_for(std::size_t n, int n_threads, F&& f)
-{
+void parallel_for(std::size_t n, int n_threads, F&& f) {
 #ifdef MQCES_HAVE_OPENMP
-    const auto         n_signed = static_cast<std::ptrdiff_t>(n);
-    const int          team     = n_threads > 0 ? n_threads : omp_get_max_threads();
-    std::exception_ptr first_error;
-    std::atomic<bool>  failed{false};
+  const auto n_signed = static_cast<std::ptrdiff_t>(n);
+  const int team = n_threads > 0 ? n_threads : omp_get_max_threads();
+  std::exception_ptr first_error;
+  std::atomic<bool> failed{false};
 #pragma omp parallel for schedule(static) num_threads(team)
-    for (std::ptrdiff_t i = 0; i < n_signed; ++i) {
-        if (failed.load(std::memory_order_relaxed)) {
-            continue;
-        }
-        try {
-            f(static_cast<std::size_t>(i));
-        } catch (...) {
+  for (std::ptrdiff_t i = 0; i < n_signed; ++i) {
+    if (failed.load(std::memory_order_relaxed)) {
+      continue;
+    }
+    try {
+      f(static_cast<std::size_t>(i));
+    } catch (...) {
 #pragma omp critical(mqces_parallel_for_error)
-            {
-                if (!first_error) {
-                    first_error = std::current_exception();
-                }
-            }
-            failed.store(true, std::memory_order_relaxed);
+      {
+        if (!first_error) {
+          first_error = std::current_exception();
         }
+      }
+      failed.store(true, std::memory_order_relaxed);
     }
-    if (first_error) {
-        std::rethrow_exception(first_error);
-    }
+  }
+  if (first_error) {
+    std::rethrow_exception(first_error);
+  }
 #else
-    (void)n_threads;
-    for (std::size_t i = 0; i < n; ++i) {
-        f(i);
-    }
+  (void)n_threads;
+  for (std::size_t i = 0; i < n; ++i) {
+    f(i);
+  }
 #endif
 }
 
 template <class F>
-void parallel_for(std::size_t n, F&& f)
-{
-    parallel_for(n, 0, std::forward<F>(f));
+void parallel_for(std::size_t n, F&& f) {
+  parallel_for(n, 0, std::forward<F>(f));
 }
 
-inline int max_threads()
-{
+inline int max_threads() {
 #ifdef MQCES_HAVE_OPENMP
-    return omp_get_max_threads();
+  return omp_get_max_threads();
 #else
-    return 1;
+  return 1;
 #endif
 }
 
-inline int current_thread_id()
-{
+inline int current_thread_id() {
 #ifdef MQCES_HAVE_OPENMP
-    return omp_get_thread_num();
+  return omp_get_thread_num();
 #else
-    return 0;
+  return 0;
 #endif
 }
 

@@ -23,10 +23,9 @@ namespace mqces {
 // options.weights). Measurement-error perturbation is not applied: it is
 // already present in the observed specimens, and perturbing only the
 // permuted splits would bias the test toward acceptance.
-bool is_none_of_the_above(
-    const Sample&            test,
-    const Class&             best,
-    double                   observed_score,
-    const ClassifierOptions& options);
+bool is_none_of_the_above(const Sample& test,
+                          const Class& best,
+                          double observed_score,
+                          const ClassifierOptions& options);
 
 }  // namespace mqces

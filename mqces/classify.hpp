@@ -38,13 +38,15 @@ namespace mqces {
 // fails to converge.
 
 namespace classic {
-ClassificationResult classify(
-    const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
+ClassificationResult classify(const Sample& test,
+                              std::span<const Class> known,
+                              const ClassifierOptions& options);
 }  // namespace classic
 
 namespace v2 {
-ClassificationResult classify(
-    const Sample& test, std::span<const Class> known, const ClassifierOptions& options);
+ClassificationResult classify(const Sample& test,
+                              std::span<const Class> known,
+                              const ClassifierOptions& options);
 }  // namespace v2
 
 }  // namespace mqces

@@ -14,8 +14,8 @@ namespace mqces {
 //
 // Tolerance on the denominator handles coincident points; pairs at distance
 // less than `eps` are skipped (treated as zero-contribution rather than NaN).
-Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-spatial_rank(const Sample& x, double eps = 1e-12);
+Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> spatial_rank(
+  const Sample& x, double eps = 1e-12);
 
 // Inverse spatial rank: given target rank vectors `u` (one per row), find
 // the points `x_tilde` in the cloud `y` that would produce those ranks
@@ -24,15 +24,15 @@ spatial_rank(const Sample& x, double eps = 1e-12);
 //
 // Throws std::runtime_error if any row fails to converge inside `max_iters`.
 struct InverseRankResult {
-    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> x_tilde;
-    std::size_t                                                            max_iters_used = 0;
-    double                                                                 max_residual = 0.0;
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> x_tilde;
+  std::size_t max_iters_used = 0;
+  double max_residual = 0.0;
 };
 
 InverseRankResult inverse_spatial_rank(
-    const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& u,
-    const Sample&                                                                 y,
-    double                                                                        tol = 1e-9,
-    std::size_t                                                                   max_iters = 200);
+  const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& u,
+  const Sample& y,
+  double tol = 1e-9,
+  std::size_t max_iters = 200);
 
 }  // namespace mqces
