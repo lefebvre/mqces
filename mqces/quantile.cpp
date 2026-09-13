@@ -1,11 +1,14 @@
 #include <mqces/detail/nonlinear_solve.hpp>
+#include <mqces/detail/parallel.hpp>
 #include <mqces/quantile.hpp>
 
 #include <Eigen/Core>
 
 #include <algorithm>
+#include <cstddef>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace mqces {
 
@@ -24,12 +27,14 @@ RowMajorMatrix spatial_rank(const Sample& x, double eps) {
   }
   const double inv_n = 1.0 / static_cast<double>(n);
 
-  // Scratch vectors are allocated once; assigning an expression of the
-  // same size into them does not reallocate inside the O(N^2) loop.
-  Eigen::VectorXd acc(d);
-  Eigen::VectorXd diff(d);
-  for (Eigen::Index j = 0; j < n; ++j) {
-    acc.setZero();
+  // Rows are independent, so they run in parallel; each writes only its own
+  // row of u. Scratch vectors are allocated once per row; assigning an
+  // expression of the same size into them does not reallocate inside the
+  // inner O(N) loop.
+  detail::parallel_for(static_cast<std::size_t>(n), [&](std::size_t row) {
+    const auto j = static_cast<Eigen::Index>(row);
+    Eigen::VectorXd acc = Eigen::VectorXd::Zero(d);
+    Eigen::VectorXd diff(d);
     for (Eigen::Index i = 0; i < n; ++i) {
       if (i == j) {
         continue;
@@ -42,7 +47,7 @@ RowMajorMatrix spatial_rank(const Sample& x, double eps) {
       acc.noalias() += diff / norm;
     }
     u.row(j) = (inv_n * acc).transpose();
-  }
+  });
   return u;
 }
 
@@ -55,12 +60,19 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
                                 ") must equal y.cols() (" + std::to_string(y.cols()) + ")");
   }
 
+  const Eigen::Index rows = u.rows();
   InverseRankResult result;
-  result.x_tilde = RowMajorMatrix::Zero(u.rows(), u.cols());
+  result.x_tilde = RowMajorMatrix::Zero(rows, u.cols());
 
-  for (Eigen::Index j = 0; j < u.rows(); ++j) {
-    Eigen::VectorXd u_j = u.row(j).transpose();
-    auto row_result = detail::solve_inverse_rank_row(u_j, y, tol, max_iters);
+  // Rows are solved independently and in parallel. Per-row iteration counts
+  // and residuals are kept so the summary is reduced after the loop instead
+  // of racing on shared maxima. If several rows fail, parallel_for rethrows
+  // the first failure it recorded, which is not necessarily the lowest row.
+  std::vector<std::size_t> iters(static_cast<std::size_t>(rows), 0);
+  std::vector<double> residuals(static_cast<std::size_t>(rows), 0.0);
+  detail::parallel_for(static_cast<std::size_t>(rows), [&](std::size_t row) {
+    const auto j = static_cast<Eigen::Index>(row);
+    auto row_result = detail::solve_inverse_rank_row(u.row(j).transpose(), y, tol, max_iters);
 
     if (!row_result.converged) {
       throw std::runtime_error("inverse_spatial_rank: row " + std::to_string(j) +
@@ -70,8 +82,13 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
     }
 
     result.x_tilde.row(j) = row_result.x.transpose();
-    result.max_iters_used = std::max(result.max_iters_used, row_result.iters);
-    result.max_residual = std::max(result.max_residual, row_result.residual);
+    iters[row] = row_result.iters;
+    residuals[row] = row_result.residual;
+  });
+
+  if (rows > 0) {
+    result.max_iters_used = *std::max_element(iters.begin(), iters.end());
+    result.max_residual = *std::max_element(residuals.begin(), residuals.end());
   }
   return result;
 }

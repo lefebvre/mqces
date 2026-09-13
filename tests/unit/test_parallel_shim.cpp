@@ -6,9 +6,12 @@
 #include <atomic>
 #include <bit>
 #include <cstdint>
+#include <mutex>
 #include <numeric>
 #include <random>
+#include <set>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 using mqces::detail::current_thread_id;
@@ -57,6 +60,40 @@ TEST(ParallelShim, ThreadCountDoesNotChangeGlobalDefault) {
   parallel_for(16, 1, [](std::size_t) {});
   parallel_for(16, before + 3, [](std::size_t) {});
   EXPECT_EQ(max_threads(), before);
+}
+
+// A parallel_for nested inside another runs serially on the calling thread,
+// so the outer loop's team size governs. With n_threads = 1 the outer region
+// is inactive in OpenMP terms, and without this guard an inner region would
+// become the first active level and use every core, defeating the cap that
+// classify's n_threads option promises.
+TEST(ParallelShim, NestedLoopRespectsOuterThreadCap) {
+  std::mutex mutex;
+  std::set<std::thread::id> threads;
+  parallel_for(4, 1, [&](std::size_t) {
+    parallel_for(256, [&](std::size_t) {
+      const std::lock_guard<std::mutex> lock(mutex);
+      threads.insert(std::this_thread::get_id());
+    });
+  });
+  EXPECT_EQ(threads.size(), 1u);
+}
+
+// Nesting depth is restored after an exception, so a later top-level loop is
+// parallel again rather than stuck on the serial path.
+TEST(ParallelShim, NestingDepthRestoredAfterException) {
+  EXPECT_THROW(parallel_for(8, 1, [](std::size_t) { throw std::runtime_error("boom"); }),
+               std::runtime_error);
+  if (max_threads() < 2) {
+    GTEST_SKIP() << "needs at least two OpenMP threads";
+  }
+  std::mutex mutex;
+  std::set<std::thread::id> threads;
+  parallel_for(4096, [&](std::size_t) {
+    const std::lock_guard<std::mutex> lock(mutex);
+    threads.insert(std::this_thread::get_id());
+  });
+  EXPECT_GT(threads.size(), 1u);
 }
 
 // Thread-id and max-threads return sensible values.
