@@ -33,6 +33,14 @@ jobs:
                   # the pytest suite against it; cibuildwheel runs this outside
                   # the source tree, so a wheel missing the extension module
                   # fails at `import mqces`.
+                  # macOS: Homebrew's libomp is keg-only, so FindOpenMP is
+                  # pointed at it, and the deployment target must not be
+                  # older than the one libomp was built for or delocate
+                  # rejects the wheel.
+                  CIBW_BEFORE_ALL_MACOS: "brew install libomp"
+                  CIBW_ENVIRONMENT_MACOS: >-
+                      OpenMP_ROOT=$(brew --prefix libomp)
+                      MACOSX_DEPLOYMENT_TARGET=14.0
                   CIBW_TEST_REQUIRES: "pytest"
                   CIBW_TEST_COMMAND: "pytest {project}/python/tests"
 

@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <numbers>
 #include <random>
 #include <utility>
@@ -62,10 +63,11 @@ inline std::uint64_t uniform_index(std::mt19937_64& rng, std::uint64_t n) {
 // Fisher-Yates shuffle of [first, first + n).
 template <class It>
 void shuffle(It first, std::size_t n, std::mt19937_64& rng) {
+  using Diff = std::iter_difference_t<It>;
+  using std::swap;
   for (std::size_t i = n; i > 1; --i) {
-    const auto j = static_cast<std::size_t>(uniform_index(rng, i));
-    using std::swap;
-    swap(first[i - 1], first[j]);
+    const std::uint64_t j = uniform_index(rng, i);
+    swap(first[static_cast<Diff>(i - 1)], first[static_cast<Diff>(j)]);
   }
 }
 

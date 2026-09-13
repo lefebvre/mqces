@@ -15,11 +15,10 @@ jobs:
         runs-on: ubuntu-22.04
         steps:
             - uses: actions/checkout@v4
+            # Ubuntu 22.04's archive has no clang-format-19; the PyPI wheel
+            # pins the same version as the pre-commit hook.
             - name: Install clang-format
-              run: |
-                sudo apt-get update
-                sudo apt-get install -y clang-format-19
-                sudo ln -sf /usr/bin/clang-format-19 /usr/local/bin/clang-format
+              run: python3 -m pip install "clang-format==19.1.7"
 
             - name: Check formatting
               run: |
@@ -47,13 +46,15 @@ jobs:
             - name: Configure (tidy preset, run via compile_commands.json)
               run: cmake --preset tidy
 
-            - name: Run clang-tidy on changed sources
+            - name: Run clang-tidy on library and CLI sources
               run: |
-                # Limit to library + apps + bindings; tests don't ride the
-                # production warning bar. The tidy preset wires
-                # MQCES_ENABLE_CLANG_TIDY=ON so the build itself surfaces
-                # diagnostics; this step also runs run-clang-tidy as a
-                # belt-and-braces check.
-                run-clang-tidy -p build/tidy -j $(nproc) \
-                    'mqces/.*\.(cpp|hpp)$' 'mqces_apps/.*\.cpp$' \
-                    || exit 1
+                # Limited to the library and the CLI; tests don't ride the
+                # production bar. run-clang-tidy matches these regexes
+                # against absolute paths, so they are anchored at the
+                # workspace root: an unanchored 'mqces/' also matches the
+                # checkout directory itself (.../mqces/mqces/tests/...).
+                # Project headers are covered through HeaderFilterRegex.
+                root="${GITHUB_WORKSPACE}"
+                run-clang-tidy -p build/tidy -j "$(nproc)" \
+                    "^${root}/mqces/[^/]+\.cpp$" \
+                    "^${root}/mqces_apps/[^/]+\.cpp$"

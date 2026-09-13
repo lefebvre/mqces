@@ -42,7 +42,8 @@ static void BM_ClassifyStrongScaling(benchmark::State& state) {
   known.reserve(static_cast<std::size_t>(n_classes));
   for (int k = 0; k < n_classes; ++k) {
     const double center = static_cast<double>(k) - 0.5 * n_classes;
-    known.push_back({"k=" + std::to_string(k), gaussian(n_specimens, d, center, 0x200u + k)});
+    known.push_back({"k=" + std::to_string(k),
+                     gaussian(n_specimens, d, center, 0x200u + static_cast<unsigned>(k))});
   }
   mqces::Sample test = gaussian(n_specimens, d, 0.0, 0xFEED);
 

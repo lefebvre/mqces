@@ -42,8 +42,11 @@ jobs:
                 echo "OMP_TOOL_LIBRARIES=$archer" >> "$GITHUB_ENV"
                 echo "ARCHER_OPTIONS=verbose=1" >> "$GITHUB_ENV"
 
+            # Block-style mapping: inside a { } flow mapping the braces of
+            # ${{ }} end the mapping early and the file fails to parse.
             - uses: hendrikmuhs/ccache-action@v1.2
-              with: { key: san-${{ matrix.sanitizer }} }
+              with:
+                  key: san-${{ matrix.sanitizer }}
 
             - name: Configure (${{ matrix.sanitizer }})
               run: cmake --preset ${{ matrix.sanitizer }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DMQCES_WERROR=ON

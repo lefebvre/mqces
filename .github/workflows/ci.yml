@@ -66,6 +66,9 @@ jobs:
                 brew install ninja ccache libomp
                 echo "CC=clang"  >> "$GITHUB_ENV"
                 echo "CXX=clang++" >> "$GITHUB_ENV"
+                # Homebrew's libomp is keg-only (not linked into the default
+                # search paths), so FindOpenMP needs to be pointed at it.
+                echo "OpenMP_ROOT=$(brew --prefix libomp)" >> "$GITHUB_ENV"
 
             - name: ccache
               if: runner.os != 'Windows'

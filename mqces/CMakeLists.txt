@@ -62,7 +62,9 @@ endif()
 
 if(MQCES_ENABLE_COVERAGE)
     target_compile_options(mqces PRIVATE --coverage -O0 -g)
-    target_link_options(mqces    PRIVATE --coverage)
+    # PUBLIC: mqces is a static library, so the gcov runtime its objects
+    # reference is only linked into executables that also pass --coverage.
+    target_link_options(mqces    PUBLIC --coverage)
 endif()
 
 set_target_properties(mqces PROPERTIES

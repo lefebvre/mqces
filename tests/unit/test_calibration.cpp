@@ -94,6 +94,6 @@ INSTANTIATE_TEST_SUITE_P(Variants,
                          Calibrated,
                          ::testing::Values(Variant{"classic", &mqces::classic::classify},
                                            Variant{"v2", &mqces::v2::classify}),
-                         [](const ::testing::TestParamInfo<Variant>& info) {
-                           return info.param.name;
+                         [](const ::testing::TestParamInfo<Variant>& param_info) {
+                           return param_info.param.name;
                          });

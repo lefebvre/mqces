@@ -91,9 +91,10 @@ inline std::uint64_t replicate_seed(std::uint64_t base,
                                     std::size_t class_index) {
   // splitmix64 of (base ^ replicate_mix ^ class_mix); each component is
   // independently splitmix'd so the bits are well-decorrelated.
-  return splitmix64(base ^
-                    splitmix64(static_cast<std::uint64_t>(replicate) * 0x9E3779B97F4A7C15ULL) ^
-                    splitmix64(static_cast<std::uint64_t>(class_index) + 1));
+  const std::uint64_t replicate_bits = replicate;
+  const std::uint64_t class_bits = class_index;
+  return splitmix64(base ^ splitmix64(replicate_bits * 0x9E3779B97F4A7C15ULL) ^
+                    splitmix64(class_bits + 1));
 }
 
 // Score of the test sample against every class, on the observed data.

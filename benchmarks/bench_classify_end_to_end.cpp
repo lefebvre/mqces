@@ -34,7 +34,8 @@ Setup build_setup(int n_classes, int n_specimens, int d, double epsilon, std::si
   s.known.reserve(static_cast<std::size_t>(n_classes));
   for (int k = 0; k < n_classes; ++k) {
     const double center = static_cast<double>(k) - 0.5 * n_classes;
-    s.known.push_back({"k=" + std::to_string(k), gaussian(n_specimens, d, center, 0x100u + k)});
+    s.known.push_back({"k=" + std::to_string(k),
+                       gaussian(n_specimens, d, center, 0x100u + static_cast<unsigned>(k))});
   }
   s.test = gaussian(n_specimens, d, 0.0, 0xFEED);
   s.opts.weights = mqces::FeatureWeights::Ones(d);
@@ -73,7 +74,7 @@ static void BM_ClassifyClassic_EpsilonSweep(benchmark::State& state) {
   const int n_classes = 19;
   const int n_specimens = 50;
   const int d = 9;
-  const double epsilon = state.range(0) / 100.0;  // 1, 5, 10, 20, 40 %
+  const double epsilon = static_cast<double>(state.range(0)) / 100.0;  // 1, 5, 10, 20, 40 %
   const std::size_t mc = 10;
   auto s = build_setup(n_classes, n_specimens, d, epsilon, mc);
   for (auto _ : state) {
