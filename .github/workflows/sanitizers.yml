@@ -57,7 +57,6 @@ jobs:
                     exit 1
                 fi
                 echo "OMP_TOOL_LIBRARIES=$archer" >> "$GITHUB_ENV"
-                echo "ARCHER_OPTIONS=verbose=1" >> "$GITHUB_ENV"
 
             # Block-style mapping: inside a { } flow mapping the braces of
             # ${{ }} end the mapping early and the file fails to parse.
@@ -80,6 +79,24 @@ jobs:
                 count=$(ldd "$binary" | grep -ciE 'lib(g|i)?omp' || true)
                 if [ "$count" -ne 1 ]; then
                     echo "expected exactly one OpenMP runtime, found $count" >&2
+                    exit 1
+                fi
+
+            # Archer can disable itself silently when it cannot find TSan, which
+            # turns every OpenMP join into a false race report. Confirm it is
+            # engaged on one parallel test. Its banner goes to stdout, so
+            # verbose mode is enabled only here: in the test run it would be
+            # prepended to the CLI's JSON output and break that test.
+            - name: Check Archer is engaged (tsan)
+              if: matrix.sanitizer == 'tsan'
+              run: |
+                out=$(ARCHER_OPTIONS=verbose=1 \
+                    TSAN_OPTIONS=halt_on_error=1:ignore_noninstrumented_modules=1 \
+                    build/tsan/tests/test_parallel_shim \
+                    --gtest_filter=ParallelShim.ParallelForVisitsAllIndicesOnce 2>&1)
+                echo "$out" | grep -i archer || true
+                if ! echo "$out" | grep -q "Archer detected OpenMP application with TSan"; then
+                    echo "Archer is not engaged; TSan results over OpenMP code would be unreliable" >&2
                     exit 1
                 fi
 
