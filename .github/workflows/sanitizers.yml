@@ -10,6 +10,13 @@ concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
+env:
+    # One LLVM release supplies the compiler, the sanitizer runtimes, libomp
+    # and Archer. With Ubuntu 22.04's LLVM 14 packages, Archer reported
+    # "OpenMP application without TSan" and disabled itself, leaving TSan to
+    # flag false races at every OpenMP join; LLVM 18 detects TSan correctly.
+    LLVM_VERSION: "18"
+
 jobs:
     sanitizer:
         name: ${{ matrix.sanitizer }}
@@ -20,12 +27,22 @@ jobs:
                 sanitizer: [asan, ubsan, tsan]
         steps:
             - uses: actions/checkout@v4
-            - name: Install toolchain
+
+            - name: Install toolchain (LLVM ${{ env.LLVM_VERSION }})
               run: |
                 sudo apt-get update
-                sudo apt-get install -y ninja-build ccache clang lld llvm libomp-dev python3-dev
-                echo "CC=clang"  >> "$GITHUB_ENV"
-                echo "CXX=clang++" >> "$GITHUB_ENV"
+                sudo apt-get install -y ninja-build ccache python3-dev wget lsb-release gnupg software-properties-common
+                wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+                sudo bash llvm.sh "${LLVM_VERSION}"
+                sudo apt-get install -y "libomp-${LLVM_VERSION}-dev"
+                llvm_root="/usr/lib/llvm-${LLVM_VERSION}"
+                {
+                    echo "CC=clang-${LLVM_VERSION}"
+                    echo "CXX=clang++-${LLVM_VERSION}"
+                    # Keep FindOpenMP on this release's libomp rather than one
+                    # of the other LLVM versions preinstalled on the runner.
+                    echo "OpenMP_ROOT=${llvm_root}"
+                } >> "$GITHUB_ENV"
 
             # libomp's worker threads are not TSan-instrumented, so TSan alone
             # reports false races on every parallel region. Archer (LLVM's
@@ -34,9 +51,9 @@ jobs:
             - name: Enable Archer (tsan)
               if: matrix.sanitizer == 'tsan'
               run: |
-                archer=$(find /usr/lib/llvm-*/lib -name 'libarcher.so' 2>/dev/null | sort -V | tail -n 1)
-                if [ -z "$archer" ]; then
-                    echo "libarcher.so not found; cannot run TSan over OpenMP code" >&2
+                archer="/usr/lib/llvm-${LLVM_VERSION}/lib/libarcher.so"
+                if [ ! -f "$archer" ]; then
+                    echo "$archer not found; cannot run TSan over OpenMP code" >&2
                     exit 1
                 fi
                 echo "OMP_TOOL_LIBRARIES=$archer" >> "$GITHUB_ENV"
@@ -46,13 +63,25 @@ jobs:
             # ${{ }} end the mapping early and the file fails to parse.
             - uses: hendrikmuhs/ccache-action@v1.2
               with:
-                  key: san-${{ matrix.sanitizer }}
+                  key: san-${{ matrix.sanitizer }}-llvm${{ env.LLVM_VERSION }}
 
             - name: Configure (${{ matrix.sanitizer }})
               run: cmake --preset ${{ matrix.sanitizer }} -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DMQCES_WERROR=ON
 
             - name: Build
               run: cmake --build --preset ${{ matrix.sanitizer }} -j
+
+            # Two OpenMP runtimes in one process each load Archer and neither
+            # coordinates with TSan; fail early with a clear message instead.
+            - name: Check OpenMP runtime
+              run: |
+                binary="build/${{ matrix.sanitizer }}/tests/test_parallel_shim"
+                ldd "$binary" | grep -iE 'omp' || true
+                count=$(ldd "$binary" | grep -ciE 'lib(g|i)?omp' || true)
+                if [ "$count" -ne 1 ]; then
+                    echo "expected exactly one OpenMP runtime, found $count" >&2
+                    exit 1
+                fi
 
             # Integration tests included: they exercise the parallel classifier
             # paths on realistic data sizes.
