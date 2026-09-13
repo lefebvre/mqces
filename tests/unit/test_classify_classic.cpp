@@ -13,6 +13,7 @@
 #include <vector>
 
 using mqces::Class;
+using mqces::ClassificationResult;
 using mqces::ClassifierOptions;
 using mqces::FeatureWeights;
 using mqces::Sample;
@@ -100,6 +101,24 @@ TEST(ClassifyClassic, ThrowsWhenNotaCanNeverFire) {
   opts.nota_threshold = 0.05;
   opts.nota_permutations = 9;
   expect_invalid(opts);
+}
+
+// Boundary of the check above. NOTA fires only when p < nota_threshold, so
+// with 19 permutations the smallest p-value, 1/20, equals the threshold and
+// can never fire: rejected. With 20 permutations the smallest p-value, 1/21,
+// is below it: accepted, and NOTA does fire on a clear outlier.
+TEST(ClassifyClassic, NotaPermutationBoundary) {
+  auto opts = default_options(3);
+  opts.nota_threshold = 0.05;
+  opts.nota_permutations = 19;
+  expect_invalid(opts);
+
+  opts.nota_permutations = 20;
+  std::vector<Class> known{make_class("k", 20, 3, 0.0, 0.3, 21)};
+  Sample outlier = gaussian_sample(20, 3, 50.0, 5.0, 22);
+  ClassificationResult res;
+  EXPECT_NO_THROW(res = mqces::classic::classify(outlier, std::span<const Class>{known}, opts));
+  EXPECT_TRUE(res.none_of_the_above);
 }
 
 // With three well-separated Gaussians, classification of a test drawn from

@@ -50,7 +50,8 @@ struct ClassifierOptions {
   double nota_threshold = 0.05;  // p-value in (0, 1)
   // Random splits drawn by the none-of-the-above permutation test; 0 skips
   // the test. The smallest attainable p-value is 1 / (nota_permutations + 1),
-  // so this must be at least 1 / nota_threshold - 1.
+  // and NOTA fires only when p < nota_threshold, so this must exceed
+  // 1 / nota_threshold - 1.
   std::size_t nota_permutations = 199;
   int n_threads = 0;  // 0 == auto (OpenMP runtime default)
 };

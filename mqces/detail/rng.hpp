@@ -35,17 +35,21 @@ inline std::mt19937_64 make_stream(std::uint64_t base_seed, std::uint64_t stream
   return std::mt19937_64(splitmix64(base_seed ^ splitmix64(stream_index)));
 }
 
-// Uniform double in the open interval (0, 1): the top 53 bits of one engine
-// output, offset by half a step so neither endpoint is reachable.
-inline double uniform_open01(std::mt19937_64& rng) {
+// Uniform double in (0, 1]: the top 53 bits of one engine output, offset by
+// half a step. Zero is unreachable, which is what Box-Muller needs (log(0)).
+// One is reachable: for the largest 53-bit value, k + 0.5 is not
+// representable and rounds to 2^53, so the result is exactly 1.0 with
+// probability 2^-53. That is harmless for Box-Muller: log(1) and cos(2π) are
+// finite.
+inline double uniform_nonzero01(std::mt19937_64& rng) {
   return (static_cast<double>(rng() >> 11) + 0.5) * 0x1.0p-53;
 }
 
 // Standard normal draw via Box-Muller. The second variate is discarded so
 // the function stays stateless.
 inline double standard_normal(std::mt19937_64& rng) {
-  const double u1 = uniform_open01(rng);
-  const double u2 = uniform_open01(rng);
+  const double u1 = uniform_nonzero01(rng);
+  const double u2 = uniform_nonzero01(rng);
   return std::sqrt(-2.0 * std::log(u1)) * std::cos(2.0 * std::numbers::pi * u2);
 }
 

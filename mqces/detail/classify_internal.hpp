@@ -74,7 +74,12 @@ inline void validate_classify_inputs(const Sample& test,
   if (!std::isfinite(alpha) || alpha <= 0.0 || alpha >= 1.0) {
     throw std::invalid_argument("classify: nota_threshold must lie in (0, 1)");
   }
-  if (opts.nota_permutations > 0 && static_cast<double>(opts.nota_permutations + 1) * alpha < 1.0) {
+  // NOTA fires only when p < nota_threshold and the smallest attainable p is
+  // 1 / (nota_permutations + 1), so equality already means it can never
+  // fire. Computed exactly as is_none_of_the_above computes p, so the check
+  // and the test cannot disagree through rounding.
+  if (opts.nota_permutations > 0 &&
+      1.0 / static_cast<double>(opts.nota_permutations + 1) >= alpha) {
     throw std::invalid_argument(
       "classify: nota_permutations (" + std::to_string(opts.nota_permutations) +
       ") is too small for the smallest p-value to fall below nota_threshold");

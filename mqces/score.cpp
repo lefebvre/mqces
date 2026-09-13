@@ -10,13 +10,14 @@ namespace mqces {
 
 namespace {
 
-// Weighted squared distance Σ_i (a_i − b_i)ᵀ diag(w) (a_i − b_i) over all rows.
+// Weighted squared distance Σ_i (a_i − b_i)ᵀ diag(w) (a_i − b_i) over all rows,
+// summed per feature first: Σ_k w_k Σ_i (a_ik − b_ik)². The lazy expression
+// materializes only the d column sums, not the (n × d) difference matrix.
 double weighted_sq_distance(
   const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& a,
   const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& b,
   const FeatureWeights& w) {
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> diff = a - b;
-  return (diff.array().square().matrix() * w).sum();
+  return (a - b).cwiseAbs2().colwise().sum().dot(w.transpose());
 }
 
 }  // namespace
