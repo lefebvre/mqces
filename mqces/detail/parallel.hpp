@@ -14,17 +14,22 @@
 
 namespace mqces::detail {
 
-// Depth of parallel_for bodies currently executing on this thread.
-inline thread_local int parallel_for_depth = 0;
+// Depth of parallel_for bodies currently executing on the calling thread.
+inline int& parallel_for_depth() {
+  thread_local int depth = 0;
+  return depth;
+}
 
 // Marks the calling thread as inside a parallel_for body for its lifetime,
 // including when the body exits by exception.
 class ParallelForBody {
   public:
-  ParallelForBody() { ++parallel_for_depth; }
-  ~ParallelForBody() { --parallel_for_depth; }
+  ParallelForBody() { ++parallel_for_depth(); }
+  ~ParallelForBody() { --parallel_for_depth(); }
   ParallelForBody(const ParallelForBody&) = delete;
   ParallelForBody& operator=(const ParallelForBody&) = delete;
+  ParallelForBody(ParallelForBody&&) = delete;
+  ParallelForBody& operator=(ParallelForBody&&) = delete;
 };
 
 // Call f(i) for every i in [0, n).
@@ -48,7 +53,7 @@ class ParallelForBody {
 template <class F>
 void parallel_for(std::size_t n, int n_threads, F&& f) {
 #ifdef MQCES_HAVE_OPENMP
-  if (parallel_for_depth > 0) {
+  if (parallel_for_depth() > 0) {
     for (std::size_t i = 0; i < n; ++i) {
       f(i);
     }
