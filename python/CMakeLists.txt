@@ -39,6 +39,15 @@ install(TARGETS _mqces_core
 
 # Copy the pure-Python wrapper next to the compiled .so so a developer can
 # run `PYTHONPATH=build/python python -m pytest python/tests` against the
-# in-tree build.
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/mqces/__init__.py
-     DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/mqces)
+# in-tree build. A build-time copy rather than file(COPY), which runs only at
+# configure time and leaves a stale wrapper after edits.
+set(_mqces_init_src "${CMAKE_CURRENT_SOURCE_DIR}/mqces/__init__.py")
+set(_mqces_init_dst "${CMAKE_CURRENT_BINARY_DIR}/mqces/__init__.py")
+add_custom_command(
+    OUTPUT  "${_mqces_init_dst}"
+    COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_mqces_init_src}" "${_mqces_init_dst}"
+    DEPENDS "${_mqces_init_src}"
+    COMMENT "Copying python/mqces/__init__.py to the build tree"
+)
+add_custom_target(mqces_python_init ALL DEPENDS "${_mqces_init_dst}")
+add_dependencies(_mqces_core mqces_python_init)

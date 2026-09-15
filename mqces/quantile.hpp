@@ -23,7 +23,9 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> spatial_r
 // the plain Weiszfeld fixed-point iteration, stopping when the step length
 // falls below `tol` (see detail/nonlinear_solve.hpp).
 //
-// Throws std::runtime_error if any row fails to converge inside `max_iters`.
+// Throws std::invalid_argument if `y` is empty or `u` and `y` differ in
+// feature count, and std::runtime_error if any row fails to converge inside
+// `max_iters`.
 struct InverseRankResult {
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> x_tilde;
   std::size_t max_iters_used = 0;

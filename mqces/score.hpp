@@ -13,8 +13,9 @@ namespace mqces {
 // y (and vice versa for ỹ), and W = diag(weights). Lower is better; 0 means
 // the two samples are indistinguishable under the rank metric.
 //
-// Throws std::invalid_argument if `weights.size() != x.cols()` or the two
-// samples have different feature counts.
+// Throws std::invalid_argument if either sample has no specimens or no
+// features, the two samples have different feature counts, or
+// `weights.size() != x.cols()`.
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights);
 
 }  // namespace mqces

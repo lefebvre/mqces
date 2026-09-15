@@ -56,7 +56,7 @@ foreach(_mode IN ITEMS fix check)
             "-DGIT=${GIT_EXECUTABLE}"
             "-DMODE=${_mode}"
             -P "${CMAKE_CURRENT_LIST_DIR}/RunClangFormat.cmake"
-        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
         COMMENT "${_comment}"
         VERBATIM
         USES_TERMINAL

@@ -23,6 +23,14 @@ double weighted_sq_distance(
 }  // namespace
 
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights) {
+  if (x.rows() == 0 || y.rows() == 0) {
+    throw std::invalid_argument(
+      "similarity_score: both samples need at least one specimen (got x.rows() = " +
+      std::to_string(x.rows()) + ", y.rows() = " + std::to_string(y.rows()) + ")");
+  }
+  if (x.cols() == 0) {
+    throw std::invalid_argument("similarity_score: samples need at least one feature column");
+  }
   if (x.cols() != y.cols()) {
     throw std::invalid_argument("similarity_score: x.cols() (" + std::to_string(x.cols()) +
                                 ") must equal y.cols() (" + std::to_string(y.cols()) + ")");
