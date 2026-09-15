@@ -97,18 +97,6 @@
                 "MQCES_ENABLE_CLI": "ON",
                 "MQCES_ENABLE_CLANG_TIDY": "ON"
             }
-        },
-        {
-            "name": "kokkos-cuda",
-            "displayName": "Kokkos + CUDA backend (compile-only CI check)",
-            "inherits": "base",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release",
-                "MQCES_ENABLE_TESTS": "OFF",
-                "MQCES_ENABLE_CLI": "OFF",
-                "MQCES_ENABLE_KOKKOS": "ON",
-                "MQCES_ENABLE_KOKKOS_CUDA": "ON"
-            }
         }
     ],
     "buildPresets": [
@@ -119,8 +107,7 @@
         { "name": "ubsan",       "configurePreset": "ubsan"       },
         { "name": "tsan",        "configurePreset": "tsan"        },
         { "name": "coverage",    "configurePreset": "coverage"    },
-        { "name": "tidy",        "configurePreset": "tidy"        },
-        { "name": "kokkos-cuda", "configurePreset": "kokkos-cuda" }
+        { "name": "tidy",        "configurePreset": "tidy"        }
     ],
     "testPresets": [
         {

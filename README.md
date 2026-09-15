@@ -13,12 +13,26 @@ The library ships two classifier variants in parallel:
 
 | Namespace | What it does |
 |-----------|--------------|
-| `mqces::classic` | Reproduces the paper's Eqs. 1–9 verbatim, including the independent-samples *t*-statistic for misclassification (Eq. 6 of the paper). |
-| `mqces::v2`      | Uses a paired-difference *t*-statistic on per-replicate score deltas, correcting the independence assumption in `classic`. Same selection rule (argmin of mean score), different uncertainty quantification. |
+| `mqces::classic` | The paper's Eqs. 1–9, using the independent-samples *t*-statistic form of Eqs. 5–7 for the misclassification probability. |
+| `mqces::v2`      | A paired-difference *t*-statistic that accounts for both scores sharing the test sample, instead of assuming them independent. Same selection rule (lowest score), different uncertainty quantification. |
 
-Both share the `similarity_score` primitive (Eq. 3), the Monte-Carlo
-measurement-error sampler (Eq. 10), and a Student's-*t*-based
-none-of-the-above (NOTA) decision.
+Both share the `similarity_score` primitive (Eq. 3) and select the class with
+the lowest score on the observed data.
+
+**Uncertainty.** In both variants the standard error of a score combines a
+delete-one jackknife over the specimens of the test sample and the class with,
+when `epsilon > 0`, the Monte-Carlo variance under the measurement-error model
+(Eq. 10). This departs from the paper, which estimates the variance from
+Monte-Carlo replicates alone: replicates re-perturb a fixed specimen set, so
+they capture measurement noise but not specimen sampling variability, which
+dominates, and the resulting probabilities are overconfident by orders of
+magnitude. On synthetic two-class problems the reported probability tracks the
+observed misclassification rate (see `tests/unit/test_calibration.cpp`).
+
+**None of the above.** NOTA is a permutation test: the observed score is
+compared with the scores of random re-splits of the pooled test and class
+specimens, which is exact under the null hypothesis that both come from one
+distribution. See `mqces/nota.hpp`.
 
 ## Layout
 
@@ -37,8 +51,8 @@ scripts/       Dev tooling (e.g. refresh_deps.py).
 Prerequisites: C++20-capable compiler (GCC ≥ 12, Clang ≥ 15, MSVC 2022),
 CMake ≥ 3.24, Python ≥ 3.9 (only if building the bindings). All other
 dependencies (Eigen 5.0.1, GoogleTest, Google Benchmark, nanobind,
-nlohmann/json, optional Kokkos) are pulled via FetchContent — nothing
-needs to be installed system-wide.
+nlohmann/json) are pulled via FetchContent — nothing needs to be installed
+system-wide.
 
 ```bash
 cmake -B build
@@ -55,15 +69,29 @@ CMake options (all prefixed `MQCES_ENABLE_*`):
 | `MQCES_ENABLE_PYTHON`       | OFF | Build the nanobind Python module. |
 | `MQCES_ENABLE_CLI`          | ON  | Build the `mqces` CLI. |
 | `MQCES_ENABLE_OPENMP`       | ON  | Use OpenMP for the parallel shim. |
-| `MQCES_ENABLE_KOKKOS`       | OFF | Use Kokkos as the parallel backend instead. |
-| `MQCES_ENABLE_KOKKOS_CUDA`  | OFF | Enable the Kokkos CUDA execution space. |
 | `MQCES_ENABLE_SANITIZER`    | none | One of `none / asan / ubsan / tsan`. |
 | `MQCES_ENABLE_COVERAGE`     | OFF | Instrument for gcovr / llvm-cov. |
 | `MQCES_ENABLE_CLANG_TIDY`   | OFF | Run clang-tidy at compile time. |
-| `MQCES_ENABLE_INSTALL`      | OFF | Emit install rules. Requires a system-installed Eigen3 (FetchContent'd Eigen cannot be re-exported through `mqcesTargets`). |
+| `MQCES_ENABLE_INSTALL`      | OFF | Emit install rules for the library and the `mqces` CLI. Requires a system-installed Eigen3 (FetchContent'd Eigen cannot be re-exported through `mqcesTargets`). |
+| `MQCES_WERROR`              | OFF | Treat compiler warnings as errors. CI builds set it. |
 
 The VS Code workspace at `.vscode/settings.json` wires the same flags
 through CMake Tools.
+
+### Formatting
+
+When `clang-format` and `git` are found at configure time, two targets
+format the same files the lint workflow checks. Neither runs as part of a
+normal build:
+
+```bash
+cmake --build build --target format        # rewrite sources in place
+cmake --build build --target format-check  # fail on any deviation
+```
+
+CI pins clang-format 19 and configure warns about any other major version.
+Select a specific binary with `-DMQCES_CLANG_FORMAT_EXE=/path/to/clang-format`
+(`pip install "clang-format==19.*"` provides one).
 
 ## Test fixtures
 
@@ -97,6 +125,13 @@ Input schema is documented at the top of
 ## Python bindings
 
 ```bash
+python -m pip install ".[test]"
+python -m pytest python/tests
+```
+
+Or against an in-tree build, without installing:
+
+```bash
 cmake -B build -DMQCES_ENABLE_PYTHON=ON
 cmake --build build -j
 PYTHONPATH=build/python .venv/bin/python -m pytest python/tests
@@ -120,8 +155,9 @@ print(result.best_class, result.misclassification_prob)
 
 ## Dependency bumps
 
-`cmake/Dependencies.cmake` pins each upstream tag explicitly. To check for
-newer releases and bump in one shot:
+`cmake/Dependencies.cmake` pins each upstream dependency by commit, recording
+the release tag it was resolved from. To check for newer releases (and for
+tags that have moved upstream) and bump in one shot:
 
 ```bash
 python3 scripts/refresh_deps.py            # dry-run

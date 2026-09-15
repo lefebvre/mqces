@@ -32,6 +32,7 @@ set(MQCES_SOURCES
 
 add_library(mqces ${MQCES_SOURCES})
 add_library(mqces::mqces ALIAS mqces)
+mqces_target_clang_tidy(mqces)
 
 target_compile_features(mqces PUBLIC cxx_std_20)
 
@@ -54,19 +55,16 @@ target_link_libraries(mqces
         $<BUILD_INTERFACE:mqces::warnings>
 )
 
-if(MQCES_ENABLE_OPENMP AND NOT MQCES_ENABLE_KOKKOS)
+if(MQCES_ENABLE_OPENMP)
     target_link_libraries(mqces PUBLIC OpenMP::OpenMP_CXX)
     target_compile_definitions(mqces PUBLIC MQCES_HAVE_OPENMP=1)
 endif()
 
-if(MQCES_ENABLE_KOKKOS)
-    target_link_libraries(mqces PUBLIC Kokkos::kokkos)
-    target_compile_definitions(mqces PUBLIC MQCES_HAVE_KOKKOS=1)
-endif()
-
 if(MQCES_ENABLE_COVERAGE)
     target_compile_options(mqces PRIVATE --coverage -O0 -g)
-    target_link_options(mqces    PRIVATE --coverage)
+    # PUBLIC: mqces is a static library, so the gcov runtime its objects
+    # reference is only linked into executables that also pass --coverage.
+    target_link_options(mqces    PUBLIC --coverage)
 endif()
 
 set_target_properties(mqces PROPERTIES

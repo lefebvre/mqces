@@ -46,7 +46,7 @@ WITHIN_CLASS_NOISE = 0.05
 # Solver settings — must match similarity_score's defaults in C++ for the
 # reference scores to be comparable.
 INV_RANK_TOL  = 1e-5
-INV_RANK_ITRS = 1000
+INV_RANK_ITRS = 50000
 
 
 # ---------------------------------------------------------------------------

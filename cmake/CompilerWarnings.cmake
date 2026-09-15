@@ -55,7 +55,7 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
         ${_mqces_gnu_warnings} ${_mqces_gcc_extra})
 endif()
 
-# Treat warnings as errors only in CI (set MQCES_WERROR externally).
+# Warnings are errors when MQCES_WERROR is ON; every CI build job sets it.
 if(MQCES_WERROR)
     if(MSVC)
         target_compile_options(mqces_warnings INTERFACE /WX)

@@ -27,6 +27,16 @@ set_target_properties(_mqces_core PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mqces"
 )
 
+# scikit-build-core populates the wheel from `cmake --install`, with the
+# install prefix at the package directory (wheel.install-dir = "mqces" in
+# pyproject.toml), so "." lands the module next to __init__.py. The
+# `python` component keeps FetchContent'd dependencies' own install rules
+# out of the wheel (pyproject.toml installs only this component).
+install(TARGETS _mqces_core
+    LIBRARY DESTINATION . COMPONENT python
+    RUNTIME DESTINATION . COMPONENT python
+)
+
 # Copy the pure-Python wrapper next to the compiled .so so a developer can
 # run `PYTHONPATH=build/python python -m pytest python/tests` against the
 # in-tree build.

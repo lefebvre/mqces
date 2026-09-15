@@ -41,7 +41,7 @@ IncludeCategories:
   - Regex:    '^<mqces/'
     Priority: 3
   # Third-party libraries
-  - Regex:    '^<(Eigen|gtest|benchmark|nanobind|Kokkos)'
+  - Regex:    '^<(Eigen|gtest|benchmark|nanobind)'
     Priority: 4
   # C++ standard library (heuristic: no slash, no extension)
   - Regex:    '^<[a-z_]+>$'

@@ -23,6 +23,7 @@ cmake.build-type = "Release"
 ninja.make-fallback = true
 wheel.packages = ["python/mqces"]
 wheel.install-dir = "mqces"
+install.components = ["python"]
 build-dir = "build/{wheel_tag}"
 
 [tool.scikit-build.cmake.define]

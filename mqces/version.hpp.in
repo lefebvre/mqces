@@ -2,9 +2,13 @@
 
 namespace mqces {
 
+// Public API names, kept snake_case rather than the kCamelCase used for
+// internal constants.
+// NOLINTBEGIN(readability-identifier-naming)
 constexpr int         version_major = @PROJECT_VERSION_MAJOR@;
 constexpr int         version_minor = @PROJECT_VERSION_MINOR@;
 constexpr int         version_patch = @PROJECT_VERSION_PATCH@;
 constexpr const char* version_string = "@PROJECT_VERSION@";
+// NOLINTEND(readability-identifier-naming)
 
 }  // namespace mqces

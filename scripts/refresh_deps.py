@@ -3,6 +3,11 @@
 FetchContent dependency declared in cmake/Dependencies.cmake, and either
 print a diff or rewrite the file in place.
 
+Dependencies are pinned by commit (MQCES_DEP_*_COMMIT); the tag
+(MQCES_DEP_*_TAG) records which release that commit came from. A bump
+rewrites both. The dry run also re-resolves each current tag and reports
+any whose upstream commit no longer matches the pin, i.e. a moved tag.
+
 Usage:
     python3 scripts/refresh_deps.py            # dry-run: print current vs latest
     python3 scripts/refresh_deps.py --apply    # rewrite cmake/Dependencies.cmake
@@ -30,13 +35,16 @@ class Dep:
     var: str            # the MQCES_DEP_*_TAG variable name
     url: str            # upstream git URL
 
+    @property
+    def commit_var(self) -> str:
+        return self.var.removesuffix("_TAG") + "_COMMIT"
+
 
 DEPS: tuple[Dep, ...] = (
     Dep("MQCES_DEP_EIGEN_TAG",     "https://gitlab.com/libeigen/eigen.git"),
     Dep("MQCES_DEP_GTEST_TAG",     "https://github.com/google/googletest.git"),
     Dep("MQCES_DEP_BENCHMARK_TAG", "https://github.com/google/benchmark.git"),
     Dep("MQCES_DEP_NANOBIND_TAG",  "https://github.com/wjakob/nanobind.git"),
-    Dep("MQCES_DEP_KOKKOS_TAG",    "https://github.com/kokkos/kokkos.git"),
     Dep("MQCES_DEP_JSON_TAG",      "https://github.com/nlohmann/json.git"),
 )
 
@@ -71,6 +79,23 @@ def latest_stable_tag(url: str) -> str:
         raise RuntimeError(f"no stable semver tag found at {url}")
     candidates.sort()
     return candidates[-1][1]
+
+
+def resolve_commit(url: str, tag: str) -> str:
+    """Return the commit `tag` points at, peeling annotated tags."""
+    out = subprocess.run(
+        ["git", "ls-remote", url, f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    refs: dict[str, str] = {}
+    for line in out.splitlines():
+        if "\t" in line:
+            sha, ref = line.split("\t", 1)
+            refs[ref] = sha
+    sha = refs.get(f"refs/tags/{tag}^{{}}") or refs.get(f"refs/tags/{tag}")
+    if sha is None:
+        raise RuntimeError(f"tag {tag} not found at {url}")
+    return sha
 
 
 def read_current(var: str, contents: str) -> str | None:
@@ -113,18 +138,29 @@ def main() -> int:
     changed = False
     new_contents = contents
 
+    moved: list[str] = []
+
     width = max(len(d.var) for d in DEPS)
     print(f"{'variable'.ljust(width)}  {'current':<10}  -> latest")
     print("-" * (width + 30))
 
     for dep in DEPS:
         current = read_current(dep.var, contents) or "?"
+        pinned = read_current(dep.commit_var, contents)
         latest = latest_stable_tag(dep.url)
         marker = "  (bump)" if latest != current else ""
+        if current != "?" and pinned is not None and resolve_commit(dep.url, current) != pinned:
+            marker += f"  (tag {current} moved upstream; pin is {pinned[:12]})"
+            moved.append(dep.var)
         print(f"{dep.var.ljust(width)}  {current:<10}  -> {latest}{marker}")
         if latest != current:
             new_contents = rewrite(dep.var, latest, new_contents)
+            new_contents = rewrite(dep.commit_var, resolve_commit(dep.url, latest), new_contents)
             changed = True
+
+    if moved:
+        print("\nWarning: upstream tags no longer match their pinned commits: "
+              + ", ".join(moved) + ". The pins were left unchanged.")
 
     if changed and args.apply:
         new_contents = update_resolved_date(new_contents)
