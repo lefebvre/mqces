@@ -34,6 +34,18 @@ compared with the scores of random re-splits of the pooled test and class
 specimens, which is exact under the null hypothesis that both come from one
 distribution. See `mqces/nota.hpp`.
 
+**Inverse-rank solver.** Every score solves the inverse-spatial-rank equation
+(Eq. 2) for each specimen. The default `weiszfeld` solver is the paper's plain
+fixed-point iteration. `anderson` accelerates it with Anderson mixing and
+accepts an accelerated step only when it lowers the objective that Weiszfeld
+descends, so it cannot cycle. Both stop at the same fixed-point residual and
+reach the same solutions to within the score's tolerance. In the benchmarks
+the solve itself is about 3x faster, and a full 19-class classification about
+1.3-1.9x faster; the gap is widest when a sample lies far from every class,
+where plain Weiszfeld needs thousands of iterations. Select it with
+`options.solver` in C++, `"solver": "anderson"` in the CLI input, or
+`solver="anderson"` in Python.
+
 ## Layout
 
 ```
@@ -149,6 +161,7 @@ result = mqces.classify(
     weights=np.array([...]),
     epsilon=0.01, mc_samples=10, seed=42,
     variant="classic",       # or "v2"
+    solver="weiszfeld",      # or "anderson"
 )
 print(result.best_class, result.misclassification_prob)
 ```

@@ -4,7 +4,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace mqces {
@@ -44,9 +46,35 @@ struct UncertaintyConfig {
   std::uint64_t seed = 0xC0FFEEULL;  // deterministic; per-replicate streams derived
 };
 
+// Iteration used to solve the inverse-spatial-rank equation (Eq. 2) inside
+// every similarity score. Both stop at the same fixed-point residual, so they
+// reach the same solution to within the score's tolerance; see
+// detail/nonlinear_solve.hpp.
+enum class InverseRankSolver : std::uint8_t {
+  Weiszfeld,  // plain fixed-point iteration, as in the paper
+  Anderson,   // Weiszfeld with Anderson acceleration; far fewer iterations
+};
+
+// Solver names as spelled by the CLI and the Python bindings.
+inline std::optional<InverseRankSolver> inverse_rank_solver_from_name(std::string_view name) {
+  if (name == "weiszfeld") {
+    return InverseRankSolver::Weiszfeld;
+  }
+  if (name == "anderson") {
+    return InverseRankSolver::Anderson;
+  }
+  return std::nullopt;
+}
+
+struct SolverConfig {
+  InverseRankSolver kind = InverseRankSolver::Weiszfeld;
+  int anderson_window = 5;  // iterates mixed per step, >= 2; used only by Anderson
+};
+
 struct ClassifierOptions {
   FeatureWeights weights;  // diag(W); required, no default — see Eq. 4
   UncertaintyConfig uncertainty{};
+  SolverConfig solver{};
   double nota_threshold = 0.05;  // p-value in (0, 1)
   // Random splits drawn by the none-of-the-above permutation test; 0 skips
   // the test. The smallest attainable p-value is 1 / (nota_permutations + 1),

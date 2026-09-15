@@ -54,7 +54,8 @@ RowMajorMatrix spatial_rank(const Sample& x, double eps) {
 InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
                                        const Sample& y,
                                        double tol,
-                                       std::size_t max_iters) {
+                                       std::size_t max_iters,
+                                       const SolverConfig& solver) {
   if (y.rows() == 0 || y.cols() == 0) {
     throw std::invalid_argument(
       "inverse_spatial_rank: y needs at least one row and one column (got " +
@@ -77,7 +78,8 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
   std::vector<double> residuals(static_cast<std::size_t>(rows), 0.0);
   detail::parallel_for(static_cast<std::size_t>(rows), [&](std::size_t row) {
     const auto j = static_cast<Eigen::Index>(row);
-    auto row_result = detail::solve_inverse_rank_row(u.row(j).transpose(), y, tol, max_iters);
+    auto row_result =
+      detail::solve_inverse_rank_row(u.row(j).transpose(), y, tol, max_iters, solver);
 
     if (!row_result.converged) {
       throw std::runtime_error("inverse_spatial_rank: row " + std::to_string(j) +
@@ -96,6 +98,13 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
     result.max_residual = *std::max_element(residuals.begin(), residuals.end());
   }
   return result;
+}
+
+InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
+                                       const Sample& y,
+                                       double tol,
+                                       std::size_t max_iters) {
+  return inverse_spatial_rank(u, y, tol, max_iters, SolverConfig{});
 }
 
 }  // namespace mqces

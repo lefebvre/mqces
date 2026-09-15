@@ -11,6 +11,7 @@ include(GoogleTest)
 set(MQCES_UNIT_TESTS
     unit/test_spatial_rank.cpp
     unit/test_inverse_rank.cpp
+    unit/test_inverse_anderson.cpp
     unit/test_score.cpp
     unit/test_uncertainty.cpp
     unit/test_parallel_shim.cpp

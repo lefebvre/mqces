@@ -16,6 +16,13 @@ namespace mqces {
 // Throws std::invalid_argument if either sample has no specimens or no
 // features, the two samples have different feature counts, or
 // `weights.size() != x.cols()`.
+//
+// The overload without a SolverConfig uses plain Weiszfeld.
 double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights);
+
+double similarity_score(const Sample& x,
+                        const Sample& y,
+                        const FeatureWeights& weights,
+                        const SolverConfig& solver);
 
 }  // namespace mqces

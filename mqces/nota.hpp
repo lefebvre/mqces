@@ -20,7 +20,7 @@ namespace mqces {
 // options.nota_permutations == 0.
 //
 // `observed_score` must be similarity_score(test, best.specimens,
-// options.weights). Measurement-error perturbation is not applied: it is
+// options.weights, options.solver). Measurement-error perturbation is not applied: it is
 // already present in the observed specimens, and perturbing only the
 // permuted splits would bias the test toward acceptance.
 bool is_none_of_the_above(const Sample& test,

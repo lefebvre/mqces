@@ -19,7 +19,9 @@
 //       "nota_threshold":    0.05,                    // default 0.05
 //       "nota_permutations": 199,                     // default 199
 //       "n_threads":         0,                       // default 0 (auto)
-//       "variant":           "classic" | "v2"         // default "classic"
+//       "variant":           "classic" | "v2",        // default "classic"
+//       "solver":            "weiszfeld" | "anderson",// default "weiszfeld"
+//       "anderson_window":   5                        // default 5
 //     }
 //   }
 //
@@ -27,6 +29,9 @@
 //   mc_samples         perturbation replicates, >= 2; used only when epsilon > 0
 //   nota_threshold     p-value threshold in (0, 1)
 //   nota_permutations  none-of-the-above permutations; 0 skips the test
+//   solver             inverse-spatial-rank iteration; "anderson" needs far
+//                      fewer iterations and reaches the same solutions
+//   anderson_window    iterates mixed per step, >= 2; used only by "anderson"
 //
 // Exit status: 0 on success, 1 on unreadable/invalid input or a failed
 // classification or write, 2 on bad command-line usage.
@@ -131,6 +136,16 @@ ParsedInput parse_input(const json& j) {
   in.options.nota_permutations = opt.value("nota_permutations", in.options.nota_permutations);
   in.options.n_threads = opt.value("n_threads", in.options.n_threads);
   in.variant = opt.value("variant", std::string{"classic"});
+
+  const auto solver_name = opt.value("solver", std::string{"weiszfeld"});
+  const auto solver = mqces::inverse_rank_solver_from_name(solver_name);
+  if (!solver) {
+    throw std::runtime_error(R"(options.solver: must be "weiszfeld" or "anderson" (got ")" +
+                             solver_name + "\")");
+  }
+  in.options.solver.kind = *solver;
+  in.options.solver.anderson_window =
+    opt.value("anderson_window", in.options.solver.anderson_window);
 
   if (in.variant != "classic" && in.variant != "v2") {
     throw std::runtime_error(R"(options.variant: must be "classic" or "v2" (got ")" + in.variant +

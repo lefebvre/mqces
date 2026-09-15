@@ -84,3 +84,34 @@ static void BM_ClassifyClassic_EpsilonSweep(benchmark::State& state) {
   state.counters["epsilon_pct"] = static_cast<double>(state.range(0));
 }
 BENCHMARK(BM_ClassifyClassic_EpsilonSweep)->Arg(1)->Arg(5)->Arg(10)->Arg(20)->Arg(40);
+
+// The same 19-class classification with each inverse-rank solver. Arg 0 is
+// Weiszfeld, 1 is Anderson.
+static void BM_ClassifyClassic_Solver(benchmark::State& state) {
+  auto s = build_setup(19, 50, 9, 0.0, 10);
+  if (state.range(0) == 1) {
+    s.opts.solver.kind = mqces::InverseRankSolver::Anderson;
+  }
+  for (auto _ : state) {
+    auto r = mqces::classic::classify(s.test, std::span<const mqces::Class>{s.known}, s.opts);
+    benchmark::DoNotOptimize(r);
+  }
+}
+BENCHMARK(BM_ClassifyClassic_Solver)->Arg(0)->Arg(1)->Unit(benchmark::kMillisecond);
+
+// A test sample far from every class. None-of-the-above then pools it with
+// the best class, and its permutations produce inverse-rank problems whose
+// solutions lie between the two groups, where plain Weiszfeld is slowest.
+// Arg 0 is Weiszfeld, 1 is Anderson.
+static void BM_ClassifyClassic_Outlier(benchmark::State& state) {
+  auto s = build_setup(5, 50, 9, 0.0, 10);
+  s.test = gaussian(50, 9, 200.0, 0xD1CE);
+  if (state.range(0) == 1) {
+    s.opts.solver.kind = mqces::InverseRankSolver::Anderson;
+  }
+  for (auto _ : state) {
+    auto r = mqces::classic::classify(s.test, std::span<const mqces::Class>{s.known}, s.opts);
+    benchmark::DoNotOptimize(r);
+  }
+}
+BENCHMARK(BM_ClassifyClassic_Outlier)->Arg(0)->Arg(1)->Unit(benchmark::kMillisecond);

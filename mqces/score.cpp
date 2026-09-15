@@ -22,7 +22,10 @@ double weighted_sq_distance(
 
 }  // namespace
 
-double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights) {
+double similarity_score(const Sample& x,
+                        const Sample& y,
+                        const FeatureWeights& weights,
+                        const SolverConfig& solver) {
   if (x.rows() == 0 || y.rows() == 0) {
     throw std::invalid_argument(
       "similarity_score: both samples need at least one specimen (got x.rows() = " +
@@ -61,10 +64,16 @@ double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& 
   // Rows that converge quickly are unaffected.
   constexpr double kScoreInvRankTol = 1e-5;
   constexpr std::size_t kScoreInvRankMaxIters = 50000;
-  auto x_tilde = inverse_spatial_rank(u_x, y, kScoreInvRankTol, kScoreInvRankMaxIters).x_tilde;
-  auto y_tilde = inverse_spatial_rank(u_y, x, kScoreInvRankTol, kScoreInvRankMaxIters).x_tilde;
+  auto x_tilde =
+    inverse_spatial_rank(u_x, y, kScoreInvRankTol, kScoreInvRankMaxIters, solver).x_tilde;
+  auto y_tilde =
+    inverse_spatial_rank(u_y, x, kScoreInvRankTol, kScoreInvRankMaxIters, solver).x_tilde;
 
   return weighted_sq_distance(x_tilde, x, weights) + weighted_sq_distance(y_tilde, y, weights);
+}
+
+double similarity_score(const Sample& x, const Sample& y, const FeatureWeights& weights) {
+  return similarity_score(x, y, weights, SolverConfig{});
 }
 
 }  // namespace mqces

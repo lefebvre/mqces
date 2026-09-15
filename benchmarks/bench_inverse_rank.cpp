@@ -49,18 +49,27 @@ Inputs make_inputs(int n_query, int m_cloud, int d, std::uint64_t seed) {
 
 }  // namespace
 
-// Cost is dominated by the Weiszfeld iterations × per-iter O(M * d) work,
+// Cost is dominated by the solver iterations × per-iteration O(M * d) work,
 // per query row. Sweep query-row count at fixed cloud size and dim.
-static void BM_InverseSpatialRank(benchmark::State& state) {
+static void run_inverse_spatial_rank(benchmark::State& state, const mqces::SolverConfig& solver) {
   const int n_query = static_cast<int>(state.range(0));
   const int m_cloud = 100;
   const int d = 9;
   auto in = make_inputs(n_query, m_cloud, d, 0xCAFE);
   for (auto _ : state) {
-    auto result = mqces::inverse_spatial_rank(in.u, in.y, 1e-7, 500);
+    auto result = mqces::inverse_spatial_rank(in.u, in.y, 1e-7, 500, solver);
     benchmark::DoNotOptimize(result.x_tilde);
   }
   state.SetItemsProcessed(state.iterations() * static_cast<int64_t>(n_query));
   state.counters["M"] = m_cloud;
 }
+
+static void BM_InverseSpatialRank(benchmark::State& state) {
+  run_inverse_spatial_rank(state, mqces::SolverConfig{});
+}
 BENCHMARK(BM_InverseSpatialRank)->Arg(10)->Arg(50)->Arg(100)->Arg(250);
+
+static void BM_InverseSpatialRankAnderson(benchmark::State& state) {
+  run_inverse_spatial_rank(state, mqces::SolverConfig{mqces::InverseRankSolver::Anderson, 5});
+}
+BENCHMARK(BM_InverseSpatialRankAnderson)->Arg(10)->Arg(50)->Arg(100)->Arg(250);
