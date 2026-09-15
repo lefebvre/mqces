@@ -6,6 +6,7 @@
 #include <Eigen/Core>
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <cstdlib>
 #include <span>
 #include <string>
@@ -81,6 +82,34 @@ TEST(BurnupPipeline, ClassifiesGenuineSamplesToTheirTrueClass) {
     nota_fired += result.none_of_the_above ? 1 : 0;
   }
   EXPECT_LE(nota_fired, 3);
+}
+
+// Choosing the Anderson solver changes how the inverse-rank equations are
+// solved, not what they solve: every sample keeps its class, scores agree to
+// well within the solver tolerance's effect on them, and the misclassification
+// probability and NOTA decision are unchanged in substance.
+TEST(BurnupPipeline, AndersonSolverGivesSameClassification) {
+  const auto known = build_known_classes();
+  auto weiszfeld_opts = default_options();
+  auto anderson_opts = weiszfeld_opts;
+  anderson_opts.solver.kind = mqces::InverseRankSolver::Anderson;
+
+  for (int k = 0; k < tf::N_CLASSES; ++k) {
+    const auto test = test_sample(k);
+    const std::span<const mqces::Class> span{known};
+    const auto w = mqces::v2::classify(test, span, weiszfeld_opts);
+    const auto a = mqces::v2::classify(test, span, anderson_opts);
+
+    EXPECT_EQ(a.best_class, w.best_class) << "k=" << k;
+    ASSERT_EQ(a.scores.size(), w.scores.size());
+    for (std::size_t i = 0; i < w.scores.size(); ++i) {
+      EXPECT_EQ(a.scores[i].class_name, w.scores[i].class_name) << "k=" << k << " rank " << i;
+      EXPECT_NEAR(a.scores[i].s_xy, w.scores[i].s_xy, 1e-3 * std::abs(w.scores[i].s_xy) + 1e-3)
+        << "k=" << k << " rank " << i;
+    }
+    EXPECT_NEAR(a.misclassification_prob, w.misclassification_prob, 0.01) << "k=" << k;
+    EXPECT_EQ(a.none_of_the_above, w.none_of_the_above) << "k=" << k;
+  }
 }
 
 // Withhold each sample's true class. The classifier must fall back to an

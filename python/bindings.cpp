@@ -74,6 +74,19 @@ mqces::FeatureWeights to_weights(const nb::ndarray<double, nb::c_contig>& arr,
   return Eigen::Map<const mqces::FeatureWeights>(arr.data(), expected_d);
 }
 
+// Solver configuration from its Python keyword arguments.
+mqces::SolverConfig to_solver(const std::string& name, int anderson_window) {
+  const auto kind = mqces::inverse_rank_solver_from_name(name);
+  if (!kind) {
+    throw std::invalid_argument("solver must be \"weiszfeld\" or \"anderson\" (got \"" + name +
+                                "\")");
+  }
+  if (*kind == mqces::InverseRankSolver::Anderson && anderson_window < 2) {
+    throw std::invalid_argument("anderson_window must be >= 2");
+  }
+  return {*kind, anderson_window};
+}
+
 nb::dict result_to_dict(const mqces::ClassificationResult& r) {
   nb::dict d;
   d["best_class"] = r.best_class;
@@ -100,7 +113,9 @@ nb::dict classify_wrapper(
   std::uint64_t seed,
   double nota_threshold,
   std::size_t nota_permutations,
-  int n_threads) {
+  int n_threads,
+  const std::string& solver,
+  int anderson_window) {
   const mqces::Sample test = to_sample(test_arr, "test");
 
   mqces::ClassifierOptions opts;
@@ -111,6 +126,7 @@ nb::dict classify_wrapper(
   opts.nota_threshold = nota_threshold;
   opts.nota_permutations = nota_permutations;
   opts.n_threads = n_threads;
+  opts.solver = to_solver(solver, anderson_window);
 
   const auto known = to_classes(classes);
   return result_to_dict(Classify(test, std::span<const mqces::Class>{known}, opts));
@@ -136,6 +152,8 @@ NB_MODULE(_mqces_core, m) {
         nb::arg("nota_threshold") = defaults.nota_threshold,
         nb::arg("nota_permutations") = defaults.nota_permutations,
         nb::arg("n_threads") = defaults.n_threads,
+        nb::arg("solver") = "weiszfeld",
+        nb::arg("anderson_window") = defaults.solver.anderson_window,
         "Run mqces::classic::classify and return a dict result.");
 
   m.def("classify_v2",
@@ -149,21 +167,27 @@ NB_MODULE(_mqces_core, m) {
         nb::arg("nota_threshold") = defaults.nota_threshold,
         nb::arg("nota_permutations") = defaults.nota_permutations,
         nb::arg("n_threads") = defaults.n_threads,
+        nb::arg("solver") = "weiszfeld",
+        nb::arg("anderson_window") = defaults.solver.anderson_window,
         "Run mqces::v2::classify and return a dict result.");
 
   m.def(
     "similarity_score",
     [](const nb::ndarray<double, nb::c_contig>& x,
        const nb::ndarray<double, nb::c_contig>& y,
-       const nb::ndarray<double, nb::c_contig>& w) {
+       const nb::ndarray<double, nb::c_contig>& w,
+       const std::string& solver,
+       int anderson_window) {
       auto xs = to_sample(x, "x");
       auto ys = to_sample(y, "y");
       auto ws = to_weights(w, xs.cols());
-      return mqces::similarity_score(xs, ys, ws);
+      return mqces::similarity_score(xs, ys, ws, to_solver(solver, anderson_window));
     },
     nb::arg("x"),
     nb::arg("y"),
     nb::arg("weights"),
+    nb::arg("solver") = "weiszfeld",
+    nb::arg("anderson_window") = defaults.solver.anderson_window,
     "Compute Eq. 3 similarity score between two samples.");
 
   m.def(

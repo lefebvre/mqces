@@ -172,3 +172,42 @@ def test_nota_flags_sample_from_unknown_distribution():
     test    = _gaussian_class(30, d, 3.0, 1.0, 2)
     res     = mqces.classify(test, classes, np.ones(d), n_threads=1)
     assert res.none_of_the_above
+
+
+@pytest.mark.parametrize("variant", ["classic", "v2"])
+def test_anderson_solver_matches_weiszfeld(variant):
+    d       = 3
+    classes = [
+        ("A", _gaussian_class(20, d, 0.0, 1.0, 5)),
+        ("B", _gaussian_class(20, d, 0.6, 1.0, 6)),
+        ("C", _gaussian_class(20, d, 3.0, 1.0, 7)),
+    ]
+    test = _gaussian_class(20, d, 0.0, 1.0, 8)
+    kwargs = dict(variant=variant, n_threads=1, nota_permutations=39)
+    w = mqces.classify(test, classes, np.ones(d), solver="weiszfeld", **kwargs)
+    a = mqces.classify(test, classes, np.ones(d), solver="anderson", **kwargs)
+    assert a.best_class == w.best_class
+    assert [s.class_name for s in a.scores] == [s.class_name for s in w.scores]
+    for sa, sw in zip(a.scores, w.scores):
+        assert math.isclose(sa.s_xy, sw.s_xy, rel_tol=1e-3, abs_tol=1e-3)
+    assert abs(a.misclassification_prob - w.misclassification_prob) < 0.01
+    assert a.none_of_the_above == w.none_of_the_above
+
+
+def test_similarity_score_accepts_solver():
+    rng = np.random.default_rng(11)
+    x   = rng.normal(size=(20, 3))
+    y   = rng.normal(loc=0.5, size=(20, 3))
+    w   = np.ones(3)
+    s_w = mqces.similarity_score(x, y, w)
+    s_a = mqces.similarity_score(x, y, w, solver="anderson", anderson_window=4)
+    assert math.isclose(s_a, s_w, rel_tol=1e-3, abs_tol=1e-6)
+
+
+@pytest.mark.parametrize("options", [{"solver": "newton"}, {"solver": "anderson", "anderson_window": 1}])
+def test_invalid_solver_options_are_rejected(options):
+    d       = 2
+    classes = [("k", _gaussian_class(10, d, 0.0, 1.0, 1))]
+    test    = _gaussian_class(10, d, 0.0, 1.0, 2)
+    with pytest.raises(ValueError):
+        mqces.classify(test, classes, np.ones(d), **options)

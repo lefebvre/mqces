@@ -88,6 +88,12 @@ file(WRITE "${WORK_DIR}/v2_input.json" "${_v2_input}")
 run_cli(0 _stdout _stderr --pretty "${WORK_DIR}/v2_input.json")
 check_result("${_stdout}" "v2")
 
+# ---- Success: Anderson solver ------------------------------------------------
+string(JSON _anderson_input SET "${_input}" options solver "\"anderson\"")
+file(WRITE "${WORK_DIR}/anderson_input.json" "${_anderson_input}")
+run_cli(0 _stdout _stderr "${WORK_DIR}/anderson_input.json")
+check_result("${_stdout}" "classic")
+
 # ---- Invalid options are rejected ------------------------------------------
 string(JSON _bad SET "${_input}" options variant "\"V2\"")
 file(WRITE "${WORK_DIR}/bad_variant.json" "${_bad}")
@@ -99,6 +105,18 @@ endif()
 string(JSON _bad SET "${_input}" options epsilon "-0.5")
 file(WRITE "${WORK_DIR}/bad_epsilon.json" "${_bad}")
 run_cli(1 _stdout _stderr "${WORK_DIR}/bad_epsilon.json")
+
+string(JSON _bad SET "${_input}" options solver "\"newton\"")
+file(WRITE "${WORK_DIR}/bad_solver.json" "${_bad}")
+run_cli(1 _stdout _stderr "${WORK_DIR}/bad_solver.json")
+if(NOT _stderr MATCHES "options\\.solver")
+    message(FATAL_ERROR "bad solver: unexpected stderr: ${_stderr}")
+endif()
+
+string(JSON _bad SET "${_input}" options solver "\"anderson\"")
+string(JSON _bad SET "${_bad}" options anderson_window "1")
+file(WRITE "${WORK_DIR}/bad_window.json" "${_bad}")
+run_cli(1 _stdout _stderr "${WORK_DIR}/bad_window.json")
 
 file(WRITE "${WORK_DIR}/not_json.json" "{ this is not json")
 run_cli(1 _stdout _stderr "${WORK_DIR}/not_json.json")

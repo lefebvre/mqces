@@ -94,6 +94,22 @@ TEST(ClassifyClassic, ThrowsOnNotaThresholdOutsideUnitInterval) {
   }
 }
 
+TEST(ClassifyClassic, ThrowsOnAndersonWindowTooSmall) {
+  auto opts = default_options(3);
+  opts.solver.kind = mqces::InverseRankSolver::Anderson;
+  opts.solver.anderson_window = 1;
+  expect_invalid(opts);
+}
+
+// The window is only read by the Anderson solver, so Weiszfeld ignores it.
+TEST(ClassifyClassic, WeiszfeldIgnoresAndersonWindow) {
+  auto opts = default_options(3);
+  opts.solver.anderson_window = 0;
+  Sample test = gaussian_sample(10, 3, 0.0, 1.0, 5);
+  std::vector<Class> known{make_class("k", 10, 3, 0.0, 1.0, 1)};
+  EXPECT_NO_THROW(mqces::classic::classify(test, std::span<const Class>{known}, opts));
+}
+
 // With 9 permutations the smallest p-value is 0.1, which can never fall
 // below 0.05: reject the configuration rather than silently never firing.
 TEST(ClassifyClassic, ThrowsWhenNotaCanNeverFire) {

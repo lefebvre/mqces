@@ -60,7 +60,8 @@ bool is_none_of_the_above(const Sample& test,
         group_class.row(j - n_test) = src;
       }
     }
-    if (similarity_score(group_test, group_class, options.weights) >= observed_score) {
+    if (similarity_score(group_test, group_class, options.weights, options.solver) >=
+        observed_score) {
       at_least_observed[i] = 1;
     }
   });

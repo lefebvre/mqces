@@ -87,6 +87,9 @@ inline void validate_classify_inputs(const Sample& test,
   if (opts.n_threads < 0) {
     throw std::invalid_argument("classify: n_threads must be >= 0");
   }
+  if (opts.solver.kind == InverseRankSolver::Anderson && opts.solver.anderson_window < 2) {
+    throw std::invalid_argument("classify: solver.anderson_window must be >= 2");
+  }
 }
 
 // Derive a deterministic seed for replicate i and class k. The test sample
@@ -108,7 +111,8 @@ inline Eigen::VectorXd observed_scores(const Sample& test,
                                        const ClassifierOptions& opts) {
   Eigen::VectorXd scores(static_cast<Eigen::Index>(known.size()));
   parallel_for(known.size(), opts.n_threads, [&](std::size_t k) {
-    scores(static_cast<Eigen::Index>(k)) = similarity_score(test, known[k].specimens, opts.weights);
+    scores(static_cast<Eigen::Index>(k)) =
+      similarity_score(test, known[k].specimens, opts.weights, opts.solver);
   });
   return scores;
 }
@@ -148,10 +152,12 @@ inline Replicates collect_replicates(const Sample& test,
   parallel_for(static_cast<std::size_t>(n_tasks), opts.n_threads, [&](std::size_t task) {
     const auto t = static_cast<Eigen::Index>(task);
     if (t < n_test) {
-      rep.drop_test(t) = similarity_score(drop_row(test, t), cls.specimens, opts.weights);
+      rep.drop_test(t) =
+        similarity_score(drop_row(test, t), cls.specimens, opts.weights, opts.solver);
     } else if (t < n_test + n_class) {
       const Eigen::Index j = t - n_test;
-      rep.drop_class(j) = similarity_score(test, drop_row(cls.specimens, j), opts.weights);
+      rep.drop_class(j) =
+        similarity_score(test, drop_row(cls.specimens, j), opts.weights, opts.solver);
     } else {
       const Eigen::Index r = t - n_test - n_class;
       const auto ri = static_cast<std::size_t>(r);
@@ -159,7 +165,8 @@ inline Replicates collect_replicates(const Sample& test,
       rep.perturbed(r) =
         similarity_score(perturb(test, eps, replicate_seed(base, ri, static_cast<std::size_t>(-1))),
                          perturb(cls.specimens, eps, replicate_seed(base, ri, class_index)),
-                         opts.weights);
+                         opts.weights,
+                         opts.solver);
     }
   });
   return rep;

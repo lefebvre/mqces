@@ -70,6 +70,8 @@ def classify(
     nota_permutations: int = 199,
     n_threads: int = 0,
     variant: Literal["classic", "v2"] = "classic",
+    solver: Literal["weiszfeld", "anderson"] = "weiszfeld",
+    anderson_window: int = 5,
 ) -> ClassificationResult:
     """Classify ``test`` against ``classes`` using the mqces method.
 
@@ -95,11 +97,19 @@ def classify(
         ``"classic"`` uses the t-statistic form of the paper's Eqs. 5-7;
         ``"v2"`` uses a paired-difference t-statistic that accounts for the
         test sample being shared by both scores. See ``mqces/classify.hpp``.
+    solver
+        Iteration used for the inverse spatial rank inside every score.
+        ``"weiszfeld"`` is the paper's plain fixed-point iteration;
+        ``"anderson"`` adds Anderson acceleration, needs far fewer iterations,
+        and reaches the same solutions to within the score's tolerance.
+    anderson_window
+        Iterates mixed per step (>= 2), used only when ``solver="anderson"``.
 
     Raises
     ------
     ValueError
-        On malformed arrays, an unknown ``variant``, or invalid options.
+        On malformed arrays, an unknown ``variant`` or ``solver``, or invalid
+        options.
     """
     test_arr    = np.ascontiguousarray(test, dtype=np.float64)
     weights_arr = np.ascontiguousarray(weights, dtype=np.float64)
@@ -123,6 +133,8 @@ def classify(
         nota_threshold=nota_threshold,
         nota_permutations=nota_permutations,
         n_threads=n_threads,
+        solver=solver,
+        anderson_window=anderson_window,
     ))
 
 

@@ -20,8 +20,10 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> spatial_r
 // Inverse spatial rank: given target rank vectors `u` (one per row), find
 // the points `x_tilde` in the cloud `y` that would produce those ranks
 // when measured against `y`. Solves Eq. 2 for each row independently with
-// the plain Weiszfeld fixed-point iteration, stopping when the step length
-// falls below `tol` (see detail/nonlinear_solve.hpp).
+// the configured solver (plain Weiszfeld when none is given), stopping when
+// the fixed-point residual falls below `tol` (see detail/nonlinear_solve.hpp).
+// For the Anderson solver `max_iters` caps outer iterations, each of which
+// sweeps the cloud once or twice.
 //
 // Throws std::invalid_argument if `y` is empty or `u` and `y` differ in
 // feature count, and std::runtime_error if any row fails to converge inside
@@ -37,5 +39,12 @@ InverseRankResult inverse_spatial_rank(
   const Sample& y,
   double tol = 1e-9,
   std::size_t max_iters = 200);
+
+InverseRankResult inverse_spatial_rank(
+  const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>& u,
+  const Sample& y,
+  double tol,
+  std::size_t max_iters,
+  const SolverConfig& solver);
 
 }  // namespace mqces
