@@ -39,7 +39,10 @@ target_compile_features(mqces PUBLIC cxx_std_20)
 target_include_directories(mqces
     PUBLIC
         # In-tree: enable #include <mqces/...> from anywhere.
-        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
+        # PROJECT_SOURCE_DIR, not CMAKE_SOURCE_DIR: when mqces is added as a
+        # subproject (FetchContent / add_subdirectory), CMAKE_SOURCE_DIR is the
+        # parent project's root.
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
         # Generated headers (version.hpp).
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         # Post-install location.
@@ -102,7 +105,7 @@ if(MQCES_ENABLE_INSTALL)
         DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mqces)
 
     configure_package_config_file(
-        "${CMAKE_SOURCE_DIR}/cmake/mqcesConfig.cmake.in"
+        "${PROJECT_SOURCE_DIR}/cmake/mqcesConfig.cmake.in"
         "${CMAKE_CURRENT_BINARY_DIR}/mqcesConfig.cmake"
         INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/mqces
     )

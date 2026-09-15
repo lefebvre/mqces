@@ -82,6 +82,11 @@ TEST(InverseRank, RoundTripOnGaussianCloud) {
 }
 
 // Mismatched feature dims must throw rather than read past the end.
+TEST(InverseRank, ThrowsOnEmptyCloud) {
+  RowMajorMatrix u = RowMajorMatrix::Zero(2, 3);
+  EXPECT_THROW(inverse_spatial_rank(u, Sample(0, 3)), std::invalid_argument);
+}
+
 TEST(InverseRank, ThrowsOnDimensionMismatch) {
   RowMajorMatrix u(2, 3);
   u.setZero();

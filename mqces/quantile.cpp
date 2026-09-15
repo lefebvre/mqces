@@ -55,6 +55,11 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
                                        const Sample& y,
                                        double tol,
                                        std::size_t max_iters) {
+  if (y.rows() == 0 || y.cols() == 0) {
+    throw std::invalid_argument(
+      "inverse_spatial_rank: y needs at least one row and one column (got " +
+      std::to_string(y.rows()) + " x " + std::to_string(y.cols()) + ")");
+  }
   if (u.cols() != y.cols()) {
     throw std::invalid_argument("inverse_spatial_rank: u.cols() (" + std::to_string(u.cols()) +
                                 ") must equal y.cols() (" + std::to_string(y.cols()) + ")");

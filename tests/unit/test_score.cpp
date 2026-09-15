@@ -37,6 +37,18 @@ TEST(SimilarityScore, ThrowsOnFeatureDimMismatch) {
 }
 
 // Weight length must match feature count.
+// Empty samples are rejected up front instead of surfacing as a solver
+// non-convergence error.
+TEST(SimilarityScore, ThrowsOnEmptySample) {
+  Sample x = gaussian_sample(10, 3, 3);
+  Sample empty(0, 3);
+  FeatureWeights w = FeatureWeights::Ones(3);
+  EXPECT_THROW(similarity_score(x, empty, w), std::invalid_argument);
+  EXPECT_THROW(similarity_score(empty, x, w), std::invalid_argument);
+  EXPECT_THROW(similarity_score(Sample(10, 0), Sample(10, 0), FeatureWeights(0)),
+               std::invalid_argument);
+}
+
 TEST(SimilarityScore, ThrowsOnWeightLengthMismatch) {
   Sample x = gaussian_sample(10, 3, 3);
   Sample y = gaussian_sample(10, 3, 4);
