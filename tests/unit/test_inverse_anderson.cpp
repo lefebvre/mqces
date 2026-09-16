@@ -4,6 +4,7 @@
 
 #include "../support/random_samples.hpp"
 
+#include <mqces/detail/nonlinear_solve.hpp>
 #include <mqces/detail/rng.hpp>
 #include <mqces/quantile.hpp>
 #include <mqces/types.hpp>
@@ -167,4 +168,69 @@ TEST(InverseRankAnderson, ConvergesToSolutionOnDataPoint) {
     const auto result = inverse_spatial_rank(u.transpose(), y, 1e-9 * scale, 20000, kAnderson);
     EXPECT_LT((result.x_tilde.row(0) - y.row(k)).norm() / scale, 1e-6) << "scale " << scale;
   }
+}
+
+// Rows of a matrix, for small hand-written samples.
+namespace {
+
+Sample rows(std::initializer_list<std::initializer_list<double>> values) {
+  Sample s(static_cast<Eigen::Index>(values.size()),
+           static_cast<Eigen::Index>(values.begin()->size()));
+  Eigen::Index i = 0;
+  for (const auto& row : values) {
+    Eigen::Index j = 0;
+    for (const double v : row) {
+      s(i, j++) = v;
+    }
+    ++i;
+  }
+  return s;
+}
+
+}  // namespace
+
+// Collinearity is judged against what floating-point distances can resolve:
+// a transverse offset below sqrt(epsilon) of the cloud's length is invisible.
+TEST(InverseRankAnderson, DetectsCollinearClouds) {
+  using mqces::detail::cloud_is_collinear;
+  EXPECT_TRUE(cloud_is_collinear(rows({{1.0, 2.0}})));
+  EXPECT_TRUE(cloud_is_collinear(rows({{1.0, 2.0}, {1.0, 2.0}, {1.0, 2.0}})));
+  EXPECT_TRUE(cloud_is_collinear(rows({{0.0}, {1.0}, {5.0}, {2.0}})));
+  EXPECT_TRUE(cloud_is_collinear(rows({{0.0, 0.0, 0.0}, {1.0, 2.0, 3.0}, {-2.0, -4.0, -6.0}})));
+  EXPECT_TRUE(cloud_is_collinear(rows({{0.0, 0.0}, {1.0, 1e-10}, {2.0, 0.0}, {3.0, -1e-10}})));
+  EXPECT_FALSE(cloud_is_collinear(rows({{0.0, 0.0}, {1.0, 1e-6}, {2.0, 0.0}, {3.0, -1e-6}})));
+  EXPECT_FALSE(cloud_is_collinear(rows({{0.0, 0.0}, {1.0, 0.0}, {0.0, 1.0}})));
+}
+
+// A one-feature cloud's inverse rank can be a whole interval, so the two
+// solvers could select different points and change the winning class. Both
+// must therefore take the Weiszfeld path and agree exactly.
+TEST(InverseRankAnderson, CollinearCloudUsesWeiszfeld) {
+  const Sample test = rows({{0.0}, {1.0}, {2.0}, {3.0}});
+  const Sample cls = rows({{0.0}, {1.0}, {2.0}, {3.0}, {4.0}, {5.0}, {6.0}, {7.0}});
+  const RowMajorMatrix u = spatial_rank(test);
+  const auto weiszfeld = inverse_spatial_rank(u, cls, 1e-5, 50000, kWeiszfeld);
+  const auto anderson = inverse_spatial_rank(u, cls, 1e-5, 50000, kAnderson);
+  EXPECT_EQ(anderson.x_tilde, weiszfeld.x_tilde);
+
+  // The same holds for points on a slanted line in three dimensions.
+  Sample line(6, 3);
+  for (Eigen::Index i = 0; i < line.rows(); ++i) {
+    const auto t = static_cast<double>(i * i) - 4.0;
+    line.row(i) << 1.0 + t, 2.0 - 2.0 * t, 0.5 * t;
+  }
+  const RowMajorMatrix u_line = spatial_rank(line.topRows(4));
+  EXPECT_EQ(inverse_spatial_rank(u_line, line, 1e-5, 50000, kAnderson).x_tilde,
+            inverse_spatial_rank(u_line, line, 1e-5, 50000, kWeiszfeld).x_tilde);
+}
+
+// A cloud with zero spread would put Anderson's start on every point at once,
+// where the Weiszfeld map is undefined. Called directly, the Anderson routine
+// hands such a cloud to plain Weiszfeld, which converges onto the point.
+TEST(InverseRankAnderson, ZeroSpreadCloudConverges) {
+  const Sample y = rows({{3.0, -1.0}, {3.0, -1.0}});
+  const Eigen::Vector2d u(0.2, -0.1);
+  const auto result = mqces::detail::solve_inverse_rank_row_anderson(u, y, 1e-9, 1000, 5);
+  ASSERT_TRUE(result.converged);
+  EXPECT_LT((result.x - y.row(0).transpose()).norm(), 1e-6);
 }

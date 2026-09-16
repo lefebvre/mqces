@@ -211,3 +211,16 @@ def test_invalid_solver_options_are_rejected(options):
     test    = _gaussian_class(10, d, 0.0, 1.0, 2)
     with pytest.raises(ValueError):
         mqces.classify(test, classes, np.ones(d), **options)
+
+
+def test_one_feature_classification_does_not_depend_on_solver():
+    # One feature makes every cloud collinear, where inverse ranks can be
+    # non-unique; both solvers must take the same path and pick class A.
+    shift   = math.sqrt(8.0)
+    test    = np.arange(4.0).reshape(-1, 1)
+    classes = [("A", np.arange(8.0).reshape(-1, 1)), ("B", (np.arange(4.0) + shift).reshape(-1, 1))]
+    kwargs  = dict(nota_permutations=0, n_threads=1)
+    w = mqces.classify(test, classes, np.ones(1), solver="weiszfeld", **kwargs)
+    a = mqces.classify(test, classes, np.ones(1), solver="anderson", **kwargs)
+    assert w.best_class == a.best_class == "A"
+    assert [(s.class_name, s.s_xy) for s in a.scores] == [(s.class_name, s.s_xy) for s in w.scores]

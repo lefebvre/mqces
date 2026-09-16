@@ -30,7 +30,8 @@
 //   nota_threshold     p-value threshold in (0, 1)
 //   nota_permutations  none-of-the-above permutations; 0 skips the test
 //   solver             inverse-spatial-rank iteration; "anderson" needs far
-//                      fewer iterations and reaches the same solutions
+//                      fewer iterations (collinear clouds always use
+//                      "weiszfeld"; see mqces/types.hpp)
 //   anderson_window    iterates mixed per step, >= 2; used only by "anderson"
 //
 // Exit status: 0 on success, 1 on unreadable/invalid input or a failed

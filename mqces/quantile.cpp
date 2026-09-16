@@ -70,6 +70,10 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
   InverseRankResult result;
   result.x_tilde = RowMajorMatrix::Zero(rows, u.cols());
 
+  // Collinear clouds use plain Weiszfeld whichever solver was requested; see
+  // detail::solver_for_cloud.
+  const SolverConfig effective_solver = detail::solver_for_cloud(y, solver);
+
   // Rows are solved independently and in parallel. Per-row iteration counts
   // and residuals are kept so the summary is reduced after the loop instead
   // of racing on shared maxima. If several rows fail, parallel_for rethrows
@@ -79,7 +83,7 @@ InverseRankResult inverse_spatial_rank(const RowMajorMatrix& u,
   detail::parallel_for(static_cast<std::size_t>(rows), [&](std::size_t row) {
     const auto j = static_cast<Eigen::Index>(row);
     auto row_result =
-      detail::solve_inverse_rank_row(u.row(j).transpose(), y, tol, max_iters, solver);
+      detail::solve_inverse_rank_row(u.row(j).transpose(), y, tol, max_iters, effective_solver);
 
     if (!row_result.converged) {
       throw std::runtime_error("inverse_spatial_rank: row " + std::to_string(j) +
