@@ -47,8 +47,12 @@ struct UncertaintyConfig {
 };
 
 // Iteration used to solve the inverse-spatial-rank equation (Eq. 2) inside
-// every similarity score. Both stop at the same fixed-point residual, so they
-// reach the same solution to within the score's tolerance; see
+// every similarity score. On well-spread data both give the same scores to
+// well within the score's tolerance. A cloud whose points are collinear (for
+// example any one-feature sample, or a jackknifed sample of two specimens)
+// can have many solutions, so it always uses Weiszfeld. On nearly collinear
+// data the solution is unique but poorly determined at the score's tolerance,
+// and the two solvers can give different scores. See
 // detail/nonlinear_solve.hpp.
 enum class InverseRankSolver : std::uint8_t {
   Weiszfeld,  // plain fixed-point iteration, as in the paper

@@ -22,6 +22,8 @@ Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> spatial_r
 // when measured against `y`. Solves Eq. 2 for each row independently with
 // the configured solver (plain Weiszfeld when none is given), stopping when
 // the fixed-point residual falls below `tol` (see detail/nonlinear_solve.hpp).
+// A collinear `y` always uses plain Weiszfeld, because its solutions need not
+// be unique and the solvers could otherwise select different ones.
 // For the Anderson solver `max_iters` caps outer iterations, each of which
 // sweeps the cloud once or twice.
 //

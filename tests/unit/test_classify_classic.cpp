@@ -110,6 +110,61 @@ TEST(ClassifyClassic, WeiszfeldIgnoresAndersonWindow) {
   EXPECT_NO_THROW(mqces::classic::classify(test, std::span<const Class>{known}, opts));
 }
 
+// Two specimens per sample is valid input, but removing one for the jackknife
+// leaves a single-point cloud. Anderson must handle it and match Weiszfeld.
+TEST(ClassifyClassic, TwoSpecimenSamplesWorkWithEitherSolver) {
+  Sample test(2, 2);
+  test << 0.0, 0.0, 2.0, 2.0;
+  Sample a(2, 2);
+  a << 1.0, 0.0, 3.0, 2.0;
+  Sample b(2, 2);
+  b << 5.0, 0.0, 7.0, 2.0;
+  const std::vector<Class> known{{"A", a}, {"B", b}};
+
+  auto opts = default_options(2);
+  opts.nota_permutations = 0;
+  const auto weiszfeld = mqces::classic::classify(test, std::span<const Class>{known}, opts);
+  opts.solver.kind = mqces::InverseRankSolver::Anderson;
+  ClassificationResult anderson;
+  ASSERT_NO_THROW(anderson = mqces::classic::classify(test, std::span<const Class>{known}, opts));
+
+  EXPECT_EQ(weiszfeld.best_class, "A");
+  EXPECT_EQ(anderson.best_class, weiszfeld.best_class);
+  ASSERT_EQ(anderson.scores.size(), weiszfeld.scores.size());
+  for (std::size_t i = 0; i < weiszfeld.scores.size(); ++i) {
+    EXPECT_EQ(anderson.scores[i].s_xy, weiszfeld.scores[i].s_xy);
+  }
+  EXPECT_EQ(anderson.misclassification_prob, weiszfeld.misclassification_prob);
+}
+
+// With one feature every cloud is collinear and its inverse ranks can be
+// non-unique. Before collinear clouds were routed to Weiszfeld, Anderson
+// selected different solutions here and chose class B instead of A.
+TEST(ClassifyClassic, OneFeatureClassificationDoesNotDependOnSolver) {
+  const double shift = std::sqrt(8.0);
+  Sample test(4, 1);
+  test << 0.0, 1.0, 2.0, 3.0;
+  Sample a(8, 1);
+  a << 0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0;
+  Sample b(4, 1);
+  b << shift, 1.0 + shift, 2.0 + shift, 3.0 + shift;
+  const std::vector<Class> known{{"A", a}, {"B", b}};
+
+  auto opts = default_options(1);
+  opts.nota_permutations = 0;
+  const auto weiszfeld = mqces::classic::classify(test, std::span<const Class>{known}, opts);
+  opts.solver.kind = mqces::InverseRankSolver::Anderson;
+  const auto anderson = mqces::classic::classify(test, std::span<const Class>{known}, opts);
+
+  EXPECT_EQ(weiszfeld.best_class, "A");
+  EXPECT_EQ(anderson.best_class, "A");
+  ASSERT_EQ(anderson.scores.size(), weiszfeld.scores.size());
+  for (std::size_t i = 0; i < weiszfeld.scores.size(); ++i) {
+    EXPECT_EQ(anderson.scores[i].class_name, weiszfeld.scores[i].class_name);
+    EXPECT_EQ(anderson.scores[i].s_xy, weiszfeld.scores[i].s_xy);
+  }
+}
+
 // With 9 permutations the smallest p-value is 0.1, which can never fall
 // below 0.05: reject the configuration rather than silently never firing.
 TEST(ClassifyClassic, ThrowsWhenNotaCanNeverFire) {

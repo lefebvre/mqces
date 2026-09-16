@@ -100,8 +100,10 @@ def classify(
     solver
         Iteration used for the inverse spatial rank inside every score.
         ``"weiszfeld"`` is the paper's plain fixed-point iteration;
-        ``"anderson"`` adds Anderson acceleration, needs far fewer iterations,
-        and reaches the same solutions to within the score's tolerance.
+        ``"anderson"`` adds Anderson acceleration and needs far fewer
+        iterations. Scores agree on well-spread data; collinear samples (for
+        example a single feature) always use ``"weiszfeld"``, and nearly
+        collinear samples can score differently. See ``mqces/types.hpp``.
     anderson_window
         Iterates mixed per step (>= 2), used only when ``solver="anderson"``.
 

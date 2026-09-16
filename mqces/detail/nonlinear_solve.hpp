@@ -4,6 +4,7 @@
 
 #include <Eigen/Cholesky>
 #include <Eigen/Core>
+#include <Eigen/SVD>
 
 #include <algorithm>
 #include <cmath>
@@ -29,7 +30,20 @@
 // clusters.
 //
 // Both solvers stop when the fixed-point residual ||G(x) − x|| falls below
-// `tol` and return G(x), so a given tolerance means the same thing for each.
+// `tol` and return G(x). That does not make their answers interchangeable:
+//
+//   * When the points of y are collinear (all on one line, including a single
+//     point or all-identical points) the sum of distances is not strictly
+//     convex along that line and the minimizer can be a whole segment. Which
+//     point an iteration reaches depends on its start and path, and no
+//     tolerance changes that. solver_for_cloud() therefore sends collinear
+//     clouds to plain Weiszfeld whichever solver was requested.
+//
+//   * When y is close to collinear the minimizer is unique but the objective
+//     is nearly flat along the line, so a small residual still allows a large
+//     distance from the minimizer. Plain Weiszfeld, being slower, tends to
+//     stop further from it at a given tolerance than Anderson does, so the
+//     two can give materially different scores.
 //
 // Plain Weiszfeld plateaus around residual ~1e-6 to ~1e-7 when the iterate
 // sits near (but not on) a y_i; similarity_score uses a 1e-5 tolerance
@@ -115,6 +129,34 @@ inline WeiszfeldResult solve_inverse_rank_row(const Eigen::Ref<const Eigen::Vect
   return r;
 }
 
+// True when the rows of y lie on one line to within what floating-point
+// distances can resolve. A point offset by b from a line changes its
+// distance a from a point on that line only by about b²/(2a), so once the
+// cloud's extent across its best-fit line falls below √ε times its extent
+// along it, the objective cannot tell the cloud from a collinear one. The
+// test compares the two largest singular values of the centered cloud; a
+// single point, identical points and any one-feature cloud all pass it.
+inline bool cloud_is_collinear(const Eigen::Ref<const RowMajorCloud>& y) {
+  if (y.rows() <= 2 || y.cols() <= 1) {
+    return true;
+  }
+  const Eigen::MatrixXd centered = y.rowwise() - y.colwise().mean();
+  const Eigen::JacobiSVD<Eigen::MatrixXd> svd(centered);
+  const auto& sigma = svd.singularValues();
+  return sigma(1) <= std::sqrt(std::numeric_limits<double>::epsilon()) * sigma(0);
+}
+
+// The solver actually used for cloud y: the requested one, except that a
+// collinear cloud always uses plain Weiszfeld so that the choice of solver
+// cannot change which of its non-unique solutions is selected.
+inline SolverConfig solver_for_cloud(const Eigen::Ref<const RowMajorCloud>& y,
+                                     const SolverConfig& requested) {
+  if (requested.kind == InverseRankSolver::Anderson && cloud_is_collinear(y)) {
+    return SolverConfig{InverseRankSolver::Weiszfeld, requested.anderson_window};
+  }
+  return requested;
+}
+
 // Weiszfeld accelerated by Anderson mixing (Type II, Walker & Ni 2011) over
 // the last `window` iterates.
 //
@@ -135,6 +177,10 @@ inline WeiszfeldResult solve_inverse_rank_row(const Eigen::Ref<const Eigen::Vect
 //
 // `iters` counts outer iterations. Each costs one or two sweeps over the
 // cloud (one when the extrapolated point is accepted).
+//
+// Meant for clouds that are not collinear (see solver_for_cloud). A cloud
+// with zero spread is handed to plain Weiszfeld here as well: its start would
+// coincide with every point, where the Weiszfeld map is undefined.
 inline WeiszfeldResult solve_inverse_rank_row_anderson(const Eigen::Ref<const Eigen::VectorXd>& u,
                                                        const Eigen::Ref<const RowMajorCloud>& y,
                                                        double tol,
@@ -149,6 +195,9 @@ inline WeiszfeldResult solve_inverse_rank_row_anderson(const Eigen::Ref<const Ei
   const Eigen::RowVectorXd centroid = y.colwise().mean();
   const double spread =
     std::sqrt((y.rowwise() - centroid).squaredNorm() / static_cast<double>(y.rows()));
+  if (spread == 0.0) {
+    return solve_inverse_rank_row(u, y, tol, max_iters, eps);
+  }
 
   WeiszfeldResult r;
   Eigen::VectorXd x = centroid.transpose() + spread * u;
@@ -224,7 +273,8 @@ inline WeiszfeldResult solve_inverse_rank_row_anderson(const Eigen::Ref<const Ei
   return r;
 }
 
-// Dispatch on the configured solver.
+// Dispatch on the configured solver, as given. inverse_spatial_rank applies
+// solver_for_cloud() once per cloud before calling this for each row.
 inline WeiszfeldResult solve_inverse_rank_row(const Eigen::Ref<const Eigen::VectorXd>& u,
                                               const Eigen::Ref<const RowMajorCloud>& y,
                                               double tol,

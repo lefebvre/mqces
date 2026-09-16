@@ -84,10 +84,11 @@ TEST(BurnupPipeline, ClassifiesGenuineSamplesToTheirTrueClass) {
   EXPECT_LE(nota_fired, 3);
 }
 
-// Choosing the Anderson solver changes how the inverse-rank equations are
-// solved, not what they solve: every sample keeps its class, scores agree to
-// well within the solver tolerance's effect on them, and the misclassification
-// probability and NOTA decision are unchanged in substance.
+// On this well-spread nine-feature fixture, choosing the Anderson solver
+// changes how the inverse-rank equations are solved, not the outcome: every
+// sample keeps its class, scores agree closely, and the misclassification
+// probability and NOTA decision are unchanged in substance. (Collinear and
+// nearly collinear data behave differently; see test_inverse_anderson.cpp.)
 TEST(BurnupPipeline, AndersonSolverGivesSameClassification) {
   const auto known = build_known_classes();
   auto weiszfeld_opts = default_options();
