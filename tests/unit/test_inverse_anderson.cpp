@@ -126,11 +126,11 @@ TEST(InverseRankAnderson, ConvergesQuicklyBetweenClusters) {
   EXPECT_LT(worst_anderson, 150u);
 }
 
-// Scaling the data by c scales Anderson's iterates by c, so a tolerance
-// relative to the scale takes the same work and gives the same solution.
-// Rounding can move the stopping point by one iteration, which changes the
-// result by about one tolerance-sized step, hence the tight tolerance here.
-TEST(InverseRankAnderson, IsScaleInvariant) {
+// Scaling the data by c scales Anderson's iterates by c, so the same
+// tolerance relative to the scale reaches the same solution. Iteration counts
+// are not compared: floating-point contraction differs between platforms and
+// moves the stopping point by a few iterations either way.
+TEST(InverseRankAnderson, SolutionScalesWithTheData) {
   constexpr double kRelTol = 1e-9;
   const Problem base = cluster_gap(500.0, 1.0, 3);
   const auto reference = inverse_spatial_rank(base.u, base.y, kRelTol, 200000, kAnderson);
@@ -138,12 +138,36 @@ TEST(InverseRankAnderson, IsScaleInvariant) {
     const Problem scaled = cluster_gap(500.0, scale, 3);
     const auto result =
       inverse_spatial_rank(scaled.u, scaled.y, kRelTol * scale, 200000, kAnderson);
-    const auto iteration_gap = static_cast<long long>(result.max_iters_used) -
-                               static_cast<long long>(reference.max_iters_used);
-    EXPECT_LE(std::llabs(iteration_gap), 1) << "scale " << scale;
     EXPECT_LT((result.x_tilde / scale - reference.x_tilde).rowwise().norm().maxCoeff(), 1e-7)
       << "scale " << scale;
   }
+}
+
+// Small-scale data must not cost more iterations. Anderson starts at
+// mean(y) + spread(y) * u; starting at mean(y) + u, as plain Weiszfeld does,
+// adds a dimensionless vector to data coordinates and lands far from the
+// solution when the data is small, which measured 2.1x the iterations at
+// scale 1e-3 on these problems.
+TEST(InverseRankAnderson, WorkDoesNotGrowAtSmallScales) {
+  const auto mean_iterations = [](double scale) {
+    std::size_t total = 0;
+    int rows = 0;
+    for (std::uint64_t seed = 0; seed < 3; ++seed) {
+      const Sample x = gaussian_sample(30, 6, 0.0, 1.0, 100 + seed) * scale;
+      const Sample y = gaussian_sample(30, 6, 0.3, 1.0, 200 + seed) * scale;
+      const RowMajorMatrix u = spatial_rank(x);
+      for (Eigen::Index r = 0; r < u.rows(); ++r) {
+        total += inverse_spatial_rank(u.row(r), y, 1e-5 * scale, 200000, kAnderson).max_iters_used;
+        ++rows;
+      }
+    }
+    return static_cast<double>(total) / rows;
+  };
+
+  const double unit_scale = mean_iterations(1.0);
+  ASSERT_GT(unit_scale, 1.0);
+  EXPECT_LT(mean_iterations(1e-3), 1.25 * unit_scale);
+  EXPECT_LT(mean_iterations(1e3), 1.25 * unit_scale);
 }
 
 // When the solution coincides with a data point the objective has a kink

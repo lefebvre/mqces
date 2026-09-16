@@ -13,6 +13,9 @@ concurrency:
 jobs:
     coverage:
         runs-on: ubuntu-22.04
+        # Well above the ~30 minutes the job takes, but low enough that a
+        # blow-up fails quickly instead of burning the 6-hour default.
+        timeout-minutes: 90
         steps:
             - uses: actions/checkout@v4
             - name: Install toolchain
@@ -31,8 +34,19 @@ jobs:
             - name: Build
               run: cmake --build --preset coverage -j
 
+            # Unoptimized and gcov-instrumented, this build runs roughly four
+            # orders of magnitude slower than Release, and the statistical
+            # tests repeat whole classifications hundreds of times: the burnup
+            # sweep alone took 2.8 hours and the job hit the 6-hour limit.
+            # Those tests are excluded here; they still run in every other
+            # job. They repeat whole classifications for statistical power
+            # rather than reaching new code, and the remaining 72 tests still
+            # cover 91% of library lines and every function. Tests run in
+            # parallel; each still uses OpenMP internally, so the job is not
+            # four times faster.
             - name: Test
-              run: ctest --preset coverage --label-regex 'unit|integration'
+              run: |
+                ctest --preset coverage -j 4 --label-regex 'unit|integration'                     --exclude-regex 'Calibrated|NOTA\.(FalsePositiveRateMatchesThreshold|DetectsShiftedDistribution)|BurnupPipeline\.(ClassifiesGenuineSamplesToTheirTrueClass|WithheldTrueClassIsFlagged)'
 
             - name: Generate coverage report
               run: |
